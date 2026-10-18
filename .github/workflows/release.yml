@@ -1,7 +1,7 @@
 name: Sürüm yayınla
 
 # "v1.2.0" gibi bir etiket gönderildiğinde ya da elle çalıştırıldığında
-# Windows ve Mac kurulum dosyalarını derler, GitHub Releases'e yükler.
+# Windows, Mac ve Android kurulum dosyalarını derler, GitHub Releases'e yükler.
 # Program güncellemeleri buradan alır.
 on:
   push:
@@ -54,3 +54,49 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --mac --publish always
+
+  android:
+    # Sürüm sayfası Windows işinde oluşturulur, APK sonra eklenir
+    needs: windows
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - name: İmza anahtarı var mı?
+        id: key
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret'ı yok, APK bu sürümde yayınlanmadı"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kurusu.jks"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Derle ve yayınla (Android)
+        if: steps.key.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npx cap sync android
+          cd android
+          ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/kurusu.jks" ANDROID_KEY_ALIAS=kurusu ANDROID_KEY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD" ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "../KurusuKurusuna-$VERSION-android.apk"
+          cd ..
+          gh release upload "v$VERSION" "KurusuKurusuna-$VERSION-android.apk" --clobber

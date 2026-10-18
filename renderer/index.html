@@ -2,7 +2,8 @@
 <html lang="tr" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self' https://api.github.com https://github.com">
   <title>Kuruşu Kuruşuna</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -10,11 +11,15 @@
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <img src="../build/icon.png" alt="" class="brand-logo">
-        <div>
+        <img src="icon.png" alt="" class="brand-logo">
+        <div class="brand-text">
           <div class="brand-name">Kuruşu Kuruşuna</div>
           <div class="brand-sub" id="brandBalance">&nbsp;</div>
         </div>
+      </div>
+      <div class="brand-tools">
+        <button class="tool-btn" data-action="toggle-hide" title="Tutarları gizle (H)"></button>
+        <button class="tool-btn lock-btn" data-action="lock-now" title="Şimdi kilitle" hidden></button>
       </div>
       <nav class="nav" id="nav">
         <button data-view="ozet" class="active"><span class="ico">◧</span>Özet</button>
@@ -29,9 +34,45 @@
         <button class="btn btn-income" data-action="new-income">+ Gelir</button>
         <button class="btn btn-expense" data-action="new-expense">+ Gider</button>
       </div>
-      <div class="hint">Kısayol: <kbd>G</kbd> gelir, <kbd>N</kbd> gider</div>
+      <div class="hint">Kısayol: <kbd>G</kbd> gelir, <kbd>N</kbd> gider, <kbd>H</kbd> gizle</div>
     </aside>
+
+    <!-- Telefon ekranı için üst başlık -->
+    <header class="mtop">
+      <img src="icon.png" alt="" class="brand-logo">
+      <div class="mtop-title"><b>Kuruşu Kuruşuna</b><span id="mBalance"></span></div>
+      <button class="tool-btn" data-action="toggle-hide" aria-label="Tutarları gizle"></button>
+      <button class="tool-btn lock-btn" data-action="lock-now" aria-label="Kilitle" hidden></button>
+      <button class="tool-btn" data-view="ayarlar" aria-label="Ayarlar">⚙</button>
+    </header>
+
+    <button class="upd-banner m-upd" id="mUpdBanner" data-action="install-update" hidden></button>
     <main class="main" id="main"></main>
+
+    <!-- Telefon ekranı için alt sekmeler -->
+    <nav class="tabbar">
+      <button data-view="ozet"><span>◧</span>Özet</button>
+      <button data-view="islemler"><span>⇅</span>İşlemler</button>
+      <button data-view="duzenli"><span>↻</span>Ödemeler<i class="tab-badge" id="mDueBadge" hidden></i></button>
+      <button data-view="birikim"><span>◎</span>Birikim</button>
+      <button data-view="butce"><span>▤</span>Bütçe</button>
+    </nav>
+    <button class="fab" data-action="quick-add" aria-label="Yeni kayıt">+</button>
+  </div>
+
+  <div class="lock" id="lock" hidden>
+    <div class="lock-box">
+      <img src="icon.png" alt="" class="lock-logo">
+      <h2>Kuruşu Kuruşuna</h2>
+      <p class="muted" id="lockHint"></p>
+      <form id="lockForm" autocomplete="off">
+        <input id="lockInput" class="input lock-input" type="password" autocomplete="off" enterkeyhint="go">
+        <button class="btn btn-primary" type="submit">Aç</button>
+      </form>
+      <div class="lock-msg" id="lockMsg"></div>
+      <button type="button" class="btn" id="lockBio" hidden></button>
+      <button type="button" class="link" id="lockForgot">Unuttum</button>
+    </div>
   </div>
 
   <dialog id="modal">
@@ -48,6 +89,7 @@
   <div class="toast" id="toast" hidden></div>
 
   <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/mobile-bridge.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

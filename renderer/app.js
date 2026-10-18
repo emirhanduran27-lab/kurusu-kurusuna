@@ -71,7 +71,7 @@ function defaultData() {
   const mk = (names, prefix) => names.map((n, i) => ({ id: prefix + (i + 1), name: n, color: PALETTE[(i + (prefix === 'e' ? 3 : 0)) % PALETTE.length] }));
   return {
     version: 1,
-    settings: { currency: 'TRY', theme: 'dark', reminderDays: 3, lastNotified: '' },
+    settings: { currency: 'TRY', theme: 'dark', reminderDays: 3, lastNotified: '', lock: null, hideAmounts: false },
     categories: {
       income: mk(['Maaş', 'Burs', 'Ek Gelir / Serbest', 'Kira Geliri', 'Yatırım Getirisi', 'Hediye', 'Diğer Gelir'], 'i'),
       expense: mk(['Kira', 'Market', 'Faturalar', 'Ulaşım', 'Yeme İçme', 'Sağlık', 'Eğitim', 'Giyim', 'Eğlence', 'Abonelikler', 'Kredi / Taksit', 'Kişisel Bakım', 'Teknoloji', 'Ev Eşyası', 'Diğer Gider'], 'e')
@@ -112,7 +112,22 @@ const S = {
 let saveTimer;
 function persist() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => api.save(S.data).catch(() => toast('Kaydedilemedi!')), 150);
+  saveTimer = setTimeout(() => {
+    api.save(S.data).catch(() => toast('Kaydedilemedi!'));
+    // Telefonda uygulama kapalıyken de hatırlatma gelsin diye bildirimler önceden planlanır
+    if (api.scheduleReminders) api.scheduleReminders(upcomingReminders()).catch(() => {});
+  }, 150);
+}
+function upcomingReminders() {
+  const s = S.data.settings, out = [];
+  const at = (dateStr, hour) => { const d = parseDate(dateStr); d.setHours(hour, 0, 0, 0); return d; };
+  S.data.recurring.filter(r => r.active !== false && r.nextDate && r.type !== 'income' && daysUntil(r.nextDate) <= 60).forEach(r => {
+    const before = parseDate(r.nextDate); before.setDate(before.getDate() - (s.reminderDays || 3));
+    const amount = s.hideAmounts ? '' : ` (${money(r.amount)})`;
+    out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${r.name}${amount} ${fmtDate(r.nextDate)} tarihinde.` });
+    out.push({ at: at(r.nextDate, 10).getTime(), title: 'Bugün ödeme günü', body: `${r.name}${amount} bugün ödenecek.` });
+  });
+  return out.filter(n => n.at > Date.now()).sort((a, b) => a.at - b.at).slice(0, 60);
 }
 function commit() { persist(); render(); }
 
@@ -168,7 +183,8 @@ function updateText() {
     case 'checking': return 'Yeni sürüm aranıyor…';
     case 'downloading': return `${u.version} sürümü indiriliyor… %${u.percent || 0}`;
     case 'ready': return `<span class="sav">${esc(u.version)} sürümü indirildi. Program kapanınca kendiliğinden kurulacak.</span>`;
-    case 'manual': return `<span class="sav">${esc(u.version)} sürümü çıktı ama kendiliğinden kurulamadı. İndirip eskisinin yerine kurman yeterli, verilerin korunur.</span>`;
+    case 'manual': return `<span class="sav">${esc(u.version)} sürümü çıktı. ${esc(u.note || 'Kendiliğinden kurulamadı, indirip eskisinin yerine kurman yeterli. Verilerin korunur.')}</span>`;
+    case 'store': return 'Güncellemeler App Store üzerinden gelir.';
     case 'latest': return '<span class="pos">En güncel sürümü kullanıyorsun.</span>';
     case 'error': return `<span class="neg">Kontrol edilemedi. İnternet bağlantını kontrol et.</span>`;
     case 'dev': return 'Geliştirme modunda güncelleme kontrolü yapılmaz.';
@@ -178,14 +194,17 @@ function updateText() {
 function updateButton() {
   if (S.update.status === 'ready') return '<button class="btn btn-primary" data-action="install-update">Şimdi kur ve yeniden başlat</button>';
   if (S.update.status === 'manual') return '<button class="btn btn-primary" data-action="install-update">Yeni sürümü indir</button>';
+  if (S.update.status === 'store') return '';
   const busy = S.update.status === 'checking' || S.update.status === 'downloading';
   return `<button class="btn" data-action="check-update" ${busy ? 'disabled' : ''}>Güncellemeleri denetle</button>`;
 }
 function refreshUpdateUI() {
   const st = $('#updStatus'); if (st) st.innerHTML = updateText();
   const bw = $('#updBtnWrap'); if (bw) bw.innerHTML = updateButton();
-  const b = $('#updBanner'), u = S.update;
-  b.className = 'upd-banner ' + u.status;
+  for (const b of $$('.upd-banner')) paintBanner(b, S.update);
+}
+function paintBanner(b, u) {
+  b.className = 'upd-banner ' + u.status + (b.id === 'mUpdBanner' ? ' m-upd' : '');
   if (u.status === 'downloading') {
     b.hidden = false;
     b.innerHTML = `<span class="upd-ico">⬇</span><div class="upd-txt"><b>Güncelleme geldi · ${esc(u.version || '')}</b>İndiriliyor, %${u.percent || 0}<div class="upd-bar"><i style="width:${u.percent || 0}%"></i></div></div>`;
@@ -194,7 +213,7 @@ function refreshUpdateUI() {
     b.innerHTML = `<span class="upd-ico">✓</span><div class="upd-txt"><b>${esc(u.version)} sürümü hazır</b>Kapatınca kurulur. Şimdi kurmak için tıkla.</div>`;
   } else if (u.status === 'manual') {
     b.hidden = false;
-    b.innerHTML = `<span class="upd-ico">!</span><div class="upd-txt"><b>${esc(u.version)} sürümü çıktı</b>İndirme sayfasını açmak için tıkla.</div>`;
+    b.innerHTML = `<span class="upd-ico">!</span><div class="upd-txt"><b>${esc(u.version)} sürümü çıktı</b>${api.platform === 'android' ? 'İndirmek için dokun.' : 'İndirme sayfasını açmak için tıkla.'}</div>`;
   } else b.hidden = true;
 }
 
@@ -223,11 +242,12 @@ function render() {
   destroyCharts();
   document.documentElement.dataset.theme = S.data.settings.theme;
   chartDefaults();
-  $$('#nav button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view));
+  $$('#nav button, .tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view));
   const due = dueList(S.data.settings.reminderDays || 3).length;
-  const badge = $('#dueBadge');
-  badge.hidden = !due; badge.textContent = due;
+  for (const id of ['#dueBadge', '#mDueBadge']) { const badge = $(id); badge.hidden = !due; badge.textContent = due; }
   $('#brandBalance').textContent = 'Bakiye: ' + money(balance());
+  $('#mBalance').textContent = money(balance());
+  applySecurityUI();
   const main = $('#main');
   const scroll = main.scrollTop;
   main.innerHTML = VIEWS[S.view]();
@@ -310,7 +330,7 @@ VIEWS.ozet = () => {
       <h2>Birikim hedefleri<span class="spacer"></span><a data-goto="birikim">Tümü</a></h2>
       ${d.goals.length ? d.goals.slice(0, 4).map(g => {
         const s = goalSaved(g), p = g.target ? Math.min(100, s / g.target * 100) : 0;
-        return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><b>${esc(g.name)}</b><span class="muted">${money(s, { noDec: true })} / ${money(g.target, { noDec: true })}</span></div><div class="bar"><i style="width:${p}%;background:${g.color}"></i></div></div>`;
+        return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><b>${esc(g.name)}</b><span class="muted money">${money(s, { noDec: true })} / ${money(g.target, { noDec: true })}</span></div><div class="bar"><i style="width:${p}%;background:${g.color}"></i></div></div>`;
       }).join('') : '<div class="empty">Henüz birikim hedefi yok.<br><button class="btn btn-sm" data-action="new-goal">Hedef oluştur</button></div>'}
     </div>
     <div class="card">
@@ -334,7 +354,7 @@ function budgetLine(c, spent, lim) {
   return `<div style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;margin-bottom:5px;gap:10px">
       <span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span>
-      <span class="${p > 100 ? 'neg' : 'muted'}">${money(spent, { noDec: true })} / ${money(lim, { noDec: true })}</span>
+      <span class="money ${p > 100 ? 'neg' : 'muted'}">${money(spent, { noDec: true })} / ${money(lim, { noDec: true })}</span>
     </div>
     <div class="bar ${cls}"><i style="width:${Math.min(100, p)}%"></i></div>
   </div>`;
@@ -416,15 +436,15 @@ VIEWS.islemler = () => {
     ${(f.q || f.type !== 'all' || f.cat !== 'all' || f.method !== 'all') ? '<button class="btn btn-sm btn-ghost" data-action="clear-filters">Filtreleri temizle</button>' : ''}
   </div>
   <div class="summary-line"><span><b>${list.length}</b> kayıt</span><span>Gelir <b class="pos">${money(inc)}</b></span><span>Gider <b class="neg">${money(exp)}</b></span><span>Fark <b>${money(inc - exp)}</b></span></div>
-  ${list.length ? `<div class="table-wrap"><table>
-    <thead><tr><th>Tarih</th><th>Açıklama</th><th>Kategori</th><th>Yöntem</th><th class="num">Tutar</th><th></th></tr></thead>
+  ${list.length ? `<div class="table-wrap"><table class="m-cards tx-table">
+    <thead><tr><th>Tarih</th><th>Açıklama</th><th class="col-hide-m">Kategori</th><th class="col-hide-m">Yöntem</th><th class="num">Tutar</th><th></th></tr></thead>
     <tbody>${list.map(t => { const c = catById(t.categoryId); return `<tr>
-      <td>${fmtDate(t.date)}</td>
-      <td>${esc(t.note) || '<span class="muted">—</span>'}${t.recurringId ? ' <span class="badge" title="Düzenli ödemeden">↻</span>' : ''}</td>
-      <td><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
-      <td class="muted">${esc(t.method || '')}</td>
-      <td class="num ${t.type === 'income' ? 'pos' : 'neg'}"><b>${t.type === 'income' ? '+' : '−'}${money(t.amount)}</b></td>
-      <td class="actions"><button class="icon-btn" data-action="edit-tx" data-id="${t.id}" title="Düzenle">✎</button><button class="icon-btn danger" data-action="del-tx" data-id="${t.id}" title="Sil">🗑</button></td>
+      <td class="c-date">${fmtDate(t.date)}<span class="m-only"> · ${esc(c.name)}</span></td>
+      <td class="c-desc">${esc(t.note) || `<span class="muted d-only">—</span><span class="m-only">${esc(c.name)}</span>`}${t.recurringId ? ' <span class="badge" title="Düzenli ödemeden">↻</span>' : ''}</td>
+      <td class="col-hide-m"><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
+      <td class="muted col-hide-m">${esc(t.method || '')}</td>
+      <td class="num c-amt ${t.type === 'income' ? 'pos' : 'neg'}"><b>${t.type === 'income' ? '+' : '−'}${money(t.amount)}</b></td>
+      <td class="actions c-act"><button class="icon-btn" data-action="edit-tx" data-id="${t.id}" title="Düzenle">✎</button><button class="icon-btn danger" data-action="del-tx" data-id="${t.id}" title="Sil">🗑</button></td>
     </tr>`; }).join('')}</tbody></table></div>` : '<div class="card empty">Bu filtrelere uyan işlem yok.</div>'}`;
 };
 AFTER.islemler = () => {
@@ -456,16 +476,16 @@ VIEWS.duzenli = () => {
     <div class="card stat"><div class="label">Geciken</div><div class="value ${late.length ? 'neg' : ''}">${late.length}</div><div class="sub">${late.length ? money(late.reduce((s, r) => s + r.amount, 0)) : 'Her şey yolunda'}</div></div>
   </div>
   <div class="mt">
-  ${list.length ? `<div class="table-wrap"><table>
-    <thead><tr><th>Ad</th><th>Kategori</th><th>Sıklık</th><th>Sonraki tarih</th><th>Durum</th><th class="num">Tutar</th><th></th></tr></thead>
+  ${list.length ? `<div class="table-wrap"><table class="m-cards rec-table">
+    <thead><tr><th>Ad</th><th class="col-hide-m">Kategori</th><th class="col-hide-m">Sıklık</th><th>Sonraki tarih</th><th>Durum</th><th class="num">Tutar</th><th></th></tr></thead>
     <tbody>${list.map(r => { const c = catById(r.categoryId); return `<tr style="${r.active === false || !r.nextDate ? 'opacity:.55' : ''}">
-      <td><b>${esc(r.name)}</b>${r.remaining != null ? `<div class="muted" style="font-size:12px">Kalan taksit: ${r.remaining}</div>` : ''}</td>
-      <td><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
-      <td class="muted">${FREQ[r.frequency]}</td>
-      <td>${r.nextDate ? fmtDate(r.nextDate) : '—'}</td>
-      <td>${dueBadge(r)}</td>
-      <td class="num ${r.type === 'income' ? 'pos' : 'neg'}"><b>${money(r.amount)}</b></td>
-      <td class="actions">
+      <td class="c-name"><b>${esc(r.name)}</b>${r.remaining != null ? `<div class="muted" style="font-size:12px">Kalan taksit: ${r.remaining}</div>` : ''}</td>
+      <td class="col-hide-m"><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
+      <td class="muted col-hide-m">${FREQ[r.frequency]}</td>
+      <td class="c-date">${r.nextDate ? fmtDate(r.nextDate) : '—'}<span class="m-only muted"> · ${FREQ[r.frequency]}</span></td>
+      <td class="c-status">${dueBadge(r)}</td>
+      <td class="num c-amt ${r.type === 'income' ? 'pos' : 'neg'}"><b>${money(r.amount)}</b></td>
+      <td class="actions c-act">
         ${r.active !== false && r.nextDate ? `<button class="btn btn-sm" data-action="pay" data-id="${r.id}">${r.type === 'income' ? 'Alındı' : 'Ödendi'}</button>
         <button class="icon-btn" data-action="skip-rec" data-id="${r.id}" title="Bu dönemi atla">⤼</button>` : ''}
         <button class="icon-btn" data-action="toggle-rec" data-id="${r.id}" title="${r.active === false ? 'Devam ettir' : 'Durdur'}">${r.active === false ? '▶' : '⏸'}</button>
@@ -539,19 +559,19 @@ VIEWS.butce = () => {
   <div class="card">
     <h2>${monthLabel(S.month)} bütçesi<span class="spacer"></span><span class="muted" style="font-weight:500">Limitli kategoriler: <b class="${totLim && totSpent > totLim ? 'neg' : ''}">${money(totSpent)}</b> / ${money(totLim)}</span></h2>
     <p class="muted" style="margin:-4px 0 12px;font-size:12.5px">Limit kutusuna aylık üst sınırı yaz. Limitler her ay için geçerlidir. Boş bırakılan kategoriler takip edilmez.</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Kategori</th><th style="width:150px">Aylık limit</th><th class="num">Harcanan</th><th class="num">Kalan</th><th style="width:28%">Durum</th><th class="num">Geçen ay</th><th class="num">6 ay ort.</th></tr></thead>
+    <div class="table-wrap"><table class="m-cards bud-table">
+      <thead><tr><th>Kategori</th><th style="width:150px">Aylık limit</th><th class="num">Harcanan</th><th class="num">Kalan</th><th style="width:28%">Durum</th><th class="num col-hide-m">Geçen ay</th><th class="num col-hide-m">6 ay ort.</th></tr></thead>
       <tbody>${cats.map(c => {
         const lim = S.data.budgets[c.id] || 0, sp = byCat[c.id] || 0, p = lim ? sp / lim * 100 : 0;
         const cls = p > 100 ? 'over' : p >= 80 ? 'warn' : '';
         return `<tr>
-          <td><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
-          <td><input class="input budget-in" data-cat="${c.id}" inputmode="decimal" placeholder="Limit yok" value="${amountToInput(lim)}" style="width:130px"></td>
-          <td class="num">${money(sp)}</td>
-          <td class="num ${lim && lim - sp < 0 ? 'neg' : ''}">${lim ? money(lim - sp) : '<span class="muted">—</span>'}</td>
-          <td>${lim ? `<div class="bar ${cls}"><i style="width:${Math.min(100, p)}%"></i></div><div class="muted" style="font-size:11.5px;margin-top:3px">%${Math.round(p)}</div>` : ''}</td>
-          <td class="num muted">${money(prevByCat[c.id] || 0, { noDec: true })}</td>
-          <td class="num muted">${money(avg[c.id] || 0, { noDec: true })}</td>
+          <td class="c-cat"><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
+          <td class="c-lim"><input class="input budget-in" data-cat="${c.id}" inputmode="decimal" placeholder="Limit yok" value="${amountToInput(lim)}" style="width:130px"></td>
+          <td class="num c-spent">${money(sp)}</td>
+          <td class="num c-rem ${lim && lim - sp < 0 ? 'neg' : ''}">${lim ? money(lim - sp) : '<span class="muted">—</span>'}</td>
+          <td class="c-bar">${lim ? `<div class="bar ${cls}"><i style="width:${Math.min(100, p)}%"></i></div><div class="muted" style="font-size:11.5px;margin-top:3px">%${Math.round(p)}</div>` : ''}</td>
+          <td class="num muted col-hide-m">${money(prevByCat[c.id] || 0, { noDec: true })}</td>
+          <td class="num muted col-hide-m">${money(avg[c.id] || 0, { noDec: true })}</td>
         </tr>`;
       }).join('')}</tbody></table></div>
   </div>
@@ -634,13 +654,20 @@ VIEWS.ayarlar = () => {
     </div>
     <div class="card">
       <h2>Veriler</h2>
-      <div class="set-row"><div class="main-col"><b>Yedek al</b><div class="muted">Tüm verileri tek bir JSON dosyasına kaydet</div></div><button class="btn" data-action="backup">Yedek al</button></div>
+      <div class="set-row"><div class="main-col"><b>Yedek al</b><div class="muted">${api.platform ? 'Yedek dosyasını Drive, e-posta ya da mesajla gönder. Bilgisayara aktarmak için de bunu kullan.' : 'Tüm verileri tek bir JSON dosyasına kaydet. Telefona aktarmak için de bunu kullan.'}</div></div><button class="btn" data-action="backup">${api.platform ? 'Paylaş' : 'Yedek al'}</button></div>
       <div class="set-row"><div class="main-col"><b>Yedekten geri yükle</b><div class="muted">Mevcut verilerin yerine yedek dosyası yüklenir</div></div><button class="btn" data-action="restore">Geri yükle</button></div>
-      <div class="set-row"><div class="main-col"><b>Excel için dışa aktar</b><div class="muted">Tüm işlemleri CSV olarak kaydet</div></div><button class="btn" data-action="export-csv-all">CSV</button></div>
-      <div class="set-row"><div class="main-col"><b>Veri klasörü</b><div class="muted">Otomatik günlük yedekler burada tutulur (son 30 gün)</div></div><button class="btn" data-action="open-folder">Klasörü aç</button></div>
+      <div class="set-row"><div class="main-col"><b>Excel için dışa aktar</b><div class="muted">Tüm işlemleri CSV olarak ${api.platform ? 'paylaş' : 'kaydet'}</div></div><button class="btn" data-action="export-csv-all">CSV</button></div>
+      ${api.platform ? '' : '<div class="set-row"><div class="main-col"><b>Veri klasörü</b><div class="muted">Otomatik günlük yedekler burada tutulur (son 30 gün)</div></div><button class="btn" data-action="open-folder">Klasörü aç</button></div>'}
       ${hasSample ? '<div class="set-row"><div class="main-col"><b>Örnek veriler</b><div class="muted">Denemek için yüklenen örnek kayıtları kaldır</div></div><button class="btn" data-action="clear-sample">Örnekleri sil</button></div>' : ''}
       <div class="set-row"><div class="main-col"><b class="neg">Tüm verileri sil</b><div class="muted">Geri alınamaz, önce yedek almanı öneririm</div></div><button class="btn btn-danger" data-action="wipe">Sıfırla</button></div>
     </div>
+  </div>
+  <div class="card mt"><h2>Güvenlik ve gizlilik</h2>
+    <div class="set-row"><div class="main-col"><b>Uygulama kilidi</b><div class="muted">${s.lock ? (s.lock.type === 'pin' ? 'Açık, PIN ile' : 'Açık, parola ile') + (s.lock.bio && SEC.bio ? `, ${esc(SEC.bio)} de kullanılabilir` : '') : 'Kapalı. İstersen program açılırken PIN ya da parola sorulur.'}</div></div>
+      ${s.lock ? '<button class="btn" data-action="lock-change">Değiştir</button><button class="btn" data-action="lock-remove">Kaldır</button>' : '<button class="btn btn-primary" data-action="lock-setup">Kilit kur</button>'}</div>
+    <div class="set-row"><div class="main-col"><b>Tutarları gizle</b><div class="muted">Yanında biri varken tüm rakamları bulanıklaştırır. Kısayol H ya da göz simgesi.</div></div>
+      <label class="switch"><input type="checkbox" id="sHide" ${s.hideAmounts ? 'checked' : ''}><span></span></label></div>
+    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">Kilit, programı açan başka birinin kayıtlarını görmesini engeller. Kilit ve gizleme ayarı her cihazın kendine aittir, yedek dosyalarına geçmez.</div></div>
   </div>
   <div class="card mt"><h2>Gider kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="expense">+ Ekle</button></h2><div class="chips">${catChips('expense')}</div></div>
   <div class="card mt"><h2>Gelir kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="income">+ Ekle</button></h2><div class="chips">${catChips('income')}</div></div>
@@ -650,7 +677,7 @@ VIEWS.ayarlar = () => {
     <div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
       <button class="btn" data-action="open-repo">GitHub sayfası</button>
       <span id="updBtnWrap">${updateButton()}</span></div>
-    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. Yeni sürüm arka planda iner, program kapanınca kendiliğinden kurulur. Verilerin güncellemeden etkilenmez.</div></div>
+    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">${api.platform === 'ios' ? 'Yeni sürümler App Store üzerinden gelir.' : api.platform === 'android' ? 'Uygulama açılırken yeni sürüm olup olmadığına bakar. Yeni sürüm çıkınca haber verir, dokununca indirilir. Verilerin güncellemeden etkilenmez.' : 'Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. Yeni sürüm arka planda iner, program kapanınca kendiliğinden kurulur. Verilerin güncellemeden etkilenmez.'}</div></div>
   </div>
   <p class="muted mt" id="appInfo" style="font-size:12px"></p>`;
 };
@@ -658,6 +685,7 @@ AFTER.ayarlar = () => {
   $('#sTheme').addEventListener('change', e => { S.data.settings.theme = e.target.value; commit(); });
   $('#sCur').addEventListener('change', e => { S.data.settings.currency = e.target.value; commit(); });
   $('#sRem').addEventListener('change', e => { S.data.settings.reminderDays = Number(e.target.value); commit(); });
+  $('#sHide').addEventListener('change', () => toggleHide());
   $$('[data-color-cat]').forEach(inp => inp.addEventListener('change', () => {
     const c = allCats().find(x => x.id === inp.dataset.colorCat); if (c) { c.color = inp.value; persist(); }
   }));
@@ -934,12 +962,185 @@ function loadSample() {
   toast('Örnek veriler yüklendi');
 }
 
+/* ---------- Güvenlik: isteğe bağlı kilit ve tutar gizleme ---------- */
+const ICON = {
+  eye: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"/><path d="M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+};
+const LOCK_ITER = 210000;
+const SEC = { fails: 0, until: 0, bio: null };
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const lockWord = t => t === 'pin' ? 'PIN' : 'parola';
+
+// PIN ya da parola düz metin olarak saklanmaz; PBKDF2 ile türetilmiş özeti tutulur
+async function deriveHash(secret, saltB64, iter) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret.normalize('NFC')), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: unb64(saltB64), iterations: iter }, key, 256);
+  return b64(bits);
+}
+async function makeLock(type, secret, bio) {
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+  return { type, salt, iter: LOCK_ITER, hash: await deriveHash(secret, salt, LOCK_ITER), bio: !!bio };
+}
+function sameStr(a, b) {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+async function checkSecret(secret) {
+  const l = S.data.settings.lock;
+  if (!l) return true;
+  return sameStr(await deriveHash(secret, l.salt, l.iter), l.hash);
+}
+function validSecret(type, v) { return type === 'pin' ? /^\d{4,8}$/.test(v) : v.length >= 6; }
+
+function applySecurityUI() {
+  const s = S.data.settings;
+  document.body.classList.toggle('hide-amounts', !!s.hideAmounts);
+  $$('[data-action=toggle-hide]').forEach(b => {
+    b.innerHTML = s.hideAmounts ? ICON.eyeOff : ICON.eye;
+    b.classList.toggle('on', !!s.hideAmounts);
+    b.title = s.hideAmounts ? 'Tutarları göster (H)' : 'Tutarları gizle (H)';
+  });
+  $$('.lock-btn').forEach(b => { b.innerHTML = ICON.lock; b.hidden = !s.lock; });
+}
+function toggleHide() {
+  S.data.settings.hideAmounts = !S.data.settings.hideAmounts;
+  persist(); applySecurityUI();
+  toast(S.data.settings.hideAmounts ? 'Tutarlar gizlendi' : 'Tutarlar gösteriliyor');
+}
+
+function lockApp() {
+  const l = S.data.settings.lock;
+  if (!l) return;
+  S.locked = true;
+  if ($('#modal').open) $('#modal').close();
+  document.body.classList.add('locked');
+  $('#lock').hidden = false;
+  $('#lockHint').textContent = l.type === 'pin' ? 'Devam etmek için PIN\'ini gir' : 'Devam etmek için parolanı gir';
+  const inp = $('#lockInput');
+  inp.value = '';
+  inp.inputMode = l.type === 'pin' ? 'numeric' : 'text';
+  inp.placeholder = l.type === 'pin' ? 'PIN' : 'Parola';
+  inp.maxLength = l.type === 'pin' ? 8 : 200;
+  $('#lockMsg').textContent = '';
+  $('#lockForgot').textContent = l.type === 'pin' ? 'PIN\'imi unuttum' : 'Parolamı unuttum';
+  const bioBtn = $('#lockBio');
+  bioBtn.hidden = !(l.bio && SEC.bio);
+  if (SEC.bio) bioBtn.textContent = `${SEC.bio} ile aç`;
+  setTimeout(() => inp.focus(), 60);
+  if (l.bio && SEC.bio) setTimeout(tryBio, 350);
+}
+function unlockApp() {
+  S.locked = false; SEC.fails = 0;
+  document.body.classList.remove('locked');
+  $('#lock').hidden = true;
+  const cb = S.onUnlock; S.onUnlock = null; cb?.();
+}
+async function tryBio() {
+  if (!S.locked) return;
+  try { if (await api.bioPrompt?.('Kuruşu Kuruşuna kilidini aç')) unlockApp(); } catch { /* kullanıcı vazgeçti */ }
+}
+$('#lockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = $('#lockMsg'), inp = $('#lockInput');
+  const wait = SEC.until - Date.now();
+  if (wait > 0) { msg.textContent = `Çok fazla yanlış deneme. ${Math.ceil(wait / 1000)} saniye bekle.`; return; }
+  const v = inp.value;
+  if (!v) return;
+  if (await checkSecret(v)) return unlockApp();
+  SEC.fails++;
+  inp.value = '';
+  const box = $('.lock-box'); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+  const word = lockWord(S.data.settings.lock.type);
+  if (SEC.fails >= 5) {
+    const secs = 30 * Math.pow(2, Math.min(SEC.fails - 5, 5));
+    SEC.until = Date.now() + secs * 1000;
+    msg.textContent = `Çok fazla yanlış deneme. ${secs} saniye bekle.`;
+  } else msg.textContent = `Yanlış ${word}. ${5 - SEC.fails} deneme hakkın kaldı.`;
+});
+$('#lockBio').addEventListener('click', tryBio);
+$('#lockForgot').addEventListener('click', () => {
+  const word = lockWord(S.data.settings.lock?.type);
+  openModal({
+    title: `${word[0].toLocaleUpperCase('tr') + word.slice(1)} unutuldu`, submit: 'Verileri sil ve kilidi kaldır', danger: true,
+    body: `<p style="margin:0">Güvenlik gereği ${word} sıfırlanamaz. Kilidi kaldırmanın tek yolu bu cihazdaki verileri silmek.</p>
+      <p class="muted" style="margin:0">Daha önce aldığın bir yedek dosyan varsa, sildikten sonra Ayarlar'dan geri yükleyebilirsin. Yedekler kilit bilgisi taşımaz.</p>
+      <p style="margin:0">Onaylamak için kutuya <b>SİL</b> yaz.</p><input class="input" name="confirm" autocomplete="off" required>`,
+    onSubmit: f => {
+      if (val(f, 'confirm').trim().toLocaleUpperCase('tr') !== 'SİL') return fieldError(f, 'confirm', 'Onay için SİL yaz');
+      S.data = defaultData(); S.view = 'ozet'; persist(); unlockApp(); render(); toast('Veriler silindi, kilit kaldırıldı');
+    }
+  });
+});
+
+// Kilit kurma ve değiştirme formu
+function lockSetupForm() {
+  const bioRow = SEC.bio ? `<label class="check"><input type="checkbox" name="bio" checked> ${esc(SEC.bio)} ile de açılabilsin</label>` : '';
+  openModal({
+    title: 'Uygulama kilidi',
+    body: `<div class="seg seg-neutral">
+        <input type="radio" name="ltype" id="ltPin" value="pin" checked><label for="ltPin">PIN</label>
+        <input type="radio" name="ltype" id="ltPass" value="password"><label for="ltPass">Parola</label>
+      </div>
+      <p class="muted" id="lockRule" style="margin:0;font-size:12.5px">4 ile 8 haneli bir sayı.</p>
+      <label class="field"><span id="lockL1">Yeni PIN</span><input class="input" name="s1" type="password" inputmode="numeric" autocomplete="new-password" required autofocus></label>
+      <label class="field"><span id="lockL2">Yeni PIN (tekrar)</span><input class="input" name="s2" type="password" inputmode="numeric" autocomplete="new-password" required></label>
+      ${bioRow}
+      <p class="muted" style="margin:0;font-size:12.5px">Unutursan kilidi açmanın tek yolu bu cihazdaki verileri silmek. Kurmadan önce Ayarlar'dan yedek almanı öneririm.</p>`,
+    submit: 'Kilidi kur',
+    onOpen: f => {
+      const upd = () => {
+        const pin = val(f, 'ltype') === 'pin';
+        $('#lockRule').textContent = pin ? '4 ile 8 haneli bir sayı.' : 'En az 6 karakter.';
+        $('#lockL1').textContent = pin ? 'Yeni PIN' : 'Yeni parola';
+        $('#lockL2').textContent = pin ? 'Yeni PIN (tekrar)' : 'Yeni parola (tekrar)';
+        f.elements.s1.inputMode = f.elements.s2.inputMode = pin ? 'numeric' : 'text';
+      };
+      $$('input[name=ltype]', f).forEach(r => r.addEventListener('change', upd));
+    },
+    onSubmit: f => {
+      const type = val(f, 'ltype'), s1 = val(f, 's1'), s2 = val(f, 's2');
+      if (!validSecret(type, s1)) return fieldError(f, 's1', type === 'pin' ? 'PIN 4 ile 8 haneli bir sayı olmalı' : 'Parola en az 6 karakter olmalı');
+      if (s1 !== s2) return fieldError(f, 's2', 'İkisi aynı değil');
+      const bio = !!f.elements.bio?.checked;
+      makeLock(type, s1, bio).then(l => { S.data.settings.lock = l; commit(); toast(type === 'pin' ? 'PIN kilidi kuruldu' : 'Parola kilidi kuruldu'); });
+    }
+  });
+}
+// Değiştirme ya da kaldırma için önce mevcut PIN/parola sorulur
+function verifyThen(title, next) {
+  const l = S.data.settings.lock;
+  openModal({
+    title, submit: 'Devam',
+    body: `<label class="field"><span>Mevcut ${lockWord(l.type)}</span><input class="input" name="cur" type="password" inputmode="${l.type === 'pin' ? 'numeric' : 'text'}" autocomplete="current-password" required autofocus></label>`,
+    onSubmit: f => {
+      checkSecret(val(f, 'cur')).then(ok => {
+        if (!ok) return fieldError(f, 'cur', `Yanlış ${lockWord(l.type)}`);
+        next();
+      });
+      return false;
+    }
+  });
+}
+
+// Yedeklerde kilit bilgisi taşınmaz; kilit her cihazın kendine ait
+function exportable() {
+  const c = JSON.parse(JSON.stringify(S.data));
+  delete c.settings.lock; delete c.settings.lastNotified;
+  return c;
+}
+
 /* ---------- Olaylar ---------- */
 document.addEventListener('click', async e => {
   const goto = e.target.closest('[data-goto]');
   if (goto) { S.view = goto.dataset.goto; render(); return; }
-  const nav = e.target.closest('#nav button');
-  if (nav) { S.view = nav.dataset.view; $('#main').scrollTop = 0; render(); return; }
+  if (S.locked) return;
+  const nav = e.target.closest('[data-view]');
+  if (nav) { S.view = nav.dataset.view; $('#main').scrollTop = 0; window.scrollTo(0, 0); render(); return; }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action, id = el.dataset.id, d = S.data;
@@ -949,6 +1150,12 @@ document.addEventListener('click', async e => {
 
   switch (a) {
     case 'new-income': return txForm(null, 'income');
+    case 'quick-add': return txForm(null, 'expense');
+    case 'toggle-hide': return toggleHide();
+    case 'lock-now': return lockApp();
+    case 'lock-setup': return lockSetupForm();
+    case 'lock-change': return verifyThen('Kilidi değiştir', lockSetupForm);
+    case 'lock-remove': return verifyThen('Kilidi kaldır', () => { S.data.settings.lock = null; $('#modal').close(); commit(); toast('Kilit kaldırıldı'); });
     case 'new-expense': return txForm(null, 'expense');
     case 'edit-tx': return txForm(findTx());
     case 'del-tx': {
@@ -1058,13 +1265,14 @@ document.addEventListener('click', async e => {
       });
     case 'del-method': d.methods.splice(Number(el.dataset.i), 1); return commit();
 
-    case 'backup': if (await api.exportJson(d)) toast('Yedek kaydedildi'); return;
+    case 'backup': if (await api.exportJson(exportable())) toast('Yedek kaydedildi'); return;
     case 'restore': {
       const imported = await api.importJson();
       if (!imported) return;
       if (!imported.transactions || !imported.categories) return toast('Bu dosya geçerli bir yedek değil');
       if (await confirmBox('Yedekten geri yükle', `Yedekte ${imported.transactions.length} işlem var. Mevcut verilerin yerine yüklensin mi?`, 'Geri yükle')) {
-        S.data = normalize(imported); commit(); toast('Yedek yüklendi');
+        const keep = { lock: S.data.settings.lock, hideAmounts: S.data.settings.hideAmounts };
+        S.data = normalize(imported); Object.assign(S.data.settings, keep); commit(); toast('Yedek yüklendi');
       }
       return;
     }
@@ -1094,11 +1302,12 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('keydown', e => {
-  if ($('#modal').open || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (S.locked || $('#modal').open || e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;
   const k = e.key.toLocaleLowerCase('tr');
   if (k === 'g') { e.preventDefault(); txForm(null, 'income'); }
   else if (k === 'n') { e.preventDefault(); txForm(null, 'expense'); }
+  else if (k === 'h') { e.preventDefault(); toggleHide(); }
 });
 
 /* ---------- Başlangıç ---------- */
@@ -1120,14 +1329,19 @@ function startupReminder() {
   S.data = normalize(loaded);
   if (!loaded) persist();
   try { S.version = (await api.info()).version; } catch { }
+  try { const b = await api.bioAvailable?.(); SEC.bio = b && b.available ? b.label : null; } catch { }
   render();
+  if (S.data.settings.lock) lockApp();
+  // Telefonda uygulama bir dakikadan uzun arka planda kalırsa yeniden kilitlenir
+  api.onResume?.(away => { if (away > 60000 && S.data.settings.lock && !S.locked) lockApp(); });
   api.onUpdate?.(st => {
     const was = S.update.status;
     S.update = st; refreshUpdateUI();
     if (st.status === 'ready' && was !== 'ready') toast(`${st.version} sürümü hazır`);
   });
   api.updateState?.().then(st => { if (st) { S.update = st; refreshUpdateUI(); } }).catch(() => {});
-  setTimeout(startupReminder, 1200);
+  if (S.locked) S.onUnlock = () => setTimeout(startupReminder, 800);
+  else setTimeout(startupReminder, 1200);
   // Uygulama gün boyu açık kalırsa gün değişiminde ekranı ve hatırlatmayı yenile
   let curDay = todayStr();
   setInterval(() => { if (todayStr() !== curDay) { curDay = todayStr(); render(); startupReminder(); } }, 60000);

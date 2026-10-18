@@ -1,2 +1,8 @@
 node_modules/
 dist/
+apple-imza/
+android-imza/
+*.jks
+*.keystore
+*.p12
+*.p8

@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, Notification, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, shell, Menu, systemPreferences } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -249,7 +249,13 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  // Pencere programın kendi sayfası dışında hiçbir yere gidemez
+  win.webContents.on('will-navigate', e => e.preventDefault());
+  win.webContents.session.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'notifications'));
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -316,6 +322,14 @@ if (!gotLock) {
     ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
     ipcMain.handle('update:state', () => updateState);
     ipcMain.handle('update:install', () => installUpdate());
+    // Mac'te Touch ID ile kilit açma
+    ipcMain.handle('bio:available', () => {
+      try { return IS_MAC && systemPreferences.canPromptTouchID() ? { available: true, label: 'Touch ID' } : { available: false }; }
+      catch { return { available: false }; }
+    });
+    ipcMain.handle('bio:prompt', async (_e, reason) => {
+      try { await systemPreferences.promptTouchID(String(reason || 'Kilidi aç')); return true; } catch { return false; }
+    });
     ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url); });
 
     createWindow();

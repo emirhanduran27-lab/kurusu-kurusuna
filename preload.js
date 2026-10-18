@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   updateState: () => ipcRenderer.invoke('update:state'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   openUrl: (url) => ipcRenderer.invoke('open:url', url),
-  onUpdate: (cb) => ipcRenderer.on('update:state', (_e, st) => cb(st))
+  onUpdate: (cb) => ipcRenderer.on('update:state', (_e, st) => cb(st)),
+  bioAvailable: () => ipcRenderer.invoke('bio:available'),
+  bioPrompt: (reason) => ipcRenderer.invoke('bio:prompt', reason)
 });

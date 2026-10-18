@@ -260,3 +260,170 @@ dialog::backdrop { background: rgba(5,10,15,.55); backdrop-filter: blur(2px); }
 .upd-status { font-size: 12.5px; }
 @keyframes upd-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes upd-pulse { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--income) 30%, transparent); } }
+
+/* Araç düğmeleri (gizle, kilitle) */
+.brand-tools { display: flex; gap: 6px; padding: 0 6px; margin-top: -8px; }
+.tool-btn {
+  width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2);
+  color: var(--muted); cursor: pointer; display: inline-grid; place-items: center; font-size: 16px; flex: none;
+}
+.tool-btn:hover { color: var(--text); }
+.tool-btn.on { color: var(--saving); border-color: color-mix(in srgb, var(--saving) 50%, transparent); }
+.tool-btn[hidden] { display: none; }
+
+/* Tutarları gizleme modu */
+.hide-amounts :is(.value, .amt, td.num, .goal-amt, .summary-line b, #brandBalance, #mBalance, .facts b, .money, .budget-in, .stat .sub, .card h2 .muted b) {
+  filter: blur(7px); user-select: none; transition: filter .2s;
+}
+.hide-amounts canvas { filter: blur(10px); }
+.hide-amounts .budget-in { pointer-events: none; }
+
+/* Anahtar (switch) */
+.switch { position: relative; width: 44px; height: 26px; flex: none; cursor: pointer; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 20px; transition: .2s; }
+.switch span::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; border-radius: 50%; background: var(--muted); transition: .2s; }
+.switch input:checked + span { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + span::after { transform: translateX(18px); background: #fff; }
+.seg-neutral input:checked + label { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+
+/* Kilit ekranı */
+body.locked .app { visibility: hidden; }
+.lock {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(800px 500px at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--bg);
+}
+.lock[hidden] { display: none; }
+.lock-box { width: min(340px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.lock-logo { width: 76px; height: 76px; border-radius: 20px; box-shadow: var(--shadow); }
+.lock-box h2 { margin: 6px 0 0; font-size: 21px; }
+.lock-box p { margin: 0; }
+.lock-box form { display: flex; gap: 8px; width: 100%; }
+.lock-input { flex: 1; font-size: 20px; letter-spacing: 4px; text-align: center; padding: 10px; }
+.lock-msg { min-height: 20px; color: var(--expense); font-size: 13px; font-weight: 600; }
+.lock-box .link { font-size: 13px; color: var(--muted); }
+.shake { animation: shake .4s; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+/* Telefon öğeleri masaüstünde gizli */
+.mtop, .tabbar, .fab, .upd-banner.m-upd { display: none; }
+
+/* ---------- Telefon ve dar ekran düzeni ---------- */
+@media (max-width: 760px) {
+  body { font-size: 15px; }
+  .app { display: block; height: auto; min-height: 100vh; }
+  .sidebar { display: none; }
+  .mtop {
+    display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 20;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 10px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--line);
+  }
+  .mtop .brand-logo { width: 32px; height: 32px; border-radius: 9px; }
+  .mtop-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .mtop-title b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mtop-title span { color: var(--muted); font-size: 12.5px; }
+  .main { overflow: visible; padding: 16px 14px calc(env(safe-area-inset-bottom) + 96px); }
+  .tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line); padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px);
+  }
+  .tabbar button {
+    background: none; border: 0; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 11px; font-weight: 600; padding: 4px 0; position: relative; cursor: pointer;
+  }
+  .tabbar button span { font-size: 19px; line-height: 1.1; }
+  .tabbar button.active { color: var(--accent); }
+  .tab-badge {
+    position: absolute; top: 0; left: calc(50% + 6px); background: var(--expense); color: #fff; font-style: normal;
+    font-size: 10px; font-weight: 700; min-width: 17px; height: 17px; border-radius: 9px; display: grid; place-items: center; padding: 0 4px;
+  }
+  .tab-badge[hidden] { display: none; }
+  .fab {
+    display: grid; place-items: center; position: fixed; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 76px); z-index: 21;
+    width: 56px; height: 56px; border-radius: 18px; border: 0; background: var(--accent); color: var(--accent-ink);
+    font-size: 30px; font-weight: 400; box-shadow: 0 8px 24px rgba(0,0,0,.35); cursor: pointer;
+  }
+  body.locked .fab, body.locked .tabbar, body.locked .mtop { display: none; }
+  .upd-banner.m-upd:not([hidden]) { display: flex; margin: 12px 14px 0; width: auto; }
+
+  .page-head { gap: 8px; margin-bottom: 14px; }
+  .page-head h1 { font-size: 20px; width: 100%; }
+  .page-head .spacer { display: none; }
+  .page-head > .btn { flex: 1; }
+  .month-nav { flex: 1; justify-content: space-between; }
+  .g4 { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g2, .g3, .g-21 { grid-template-columns: 1fr; }
+  .grid { gap: 12px; }
+  .card { padding: 14px; border-radius: 14px; }
+  .stat .value { font-size: 19px; }
+  .stat .sub { font-size: 11.5px; }
+  .chart-box { height: 220px; }
+  .chart-box.tall { height: 260px; }
+  .row { flex-wrap: wrap; }
+  .row .main-col { flex-basis: 50%; }
+
+  .toolbar .input { flex: 1 1 45%; min-width: 0; }
+  #fQ { flex-basis: 100% !important; width: auto !important; }
+  .summary-line { gap: 12px; font-size: 12.5px; }
+
+  /* Tablolar yatay kaydırılır, az önemli sütunlar gizlenir */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { padding: 9px 10px; }
+  .col-hide-m { display: none; }
+  td.actions { white-space: nowrap; }
+
+  .goal .btns .btn { flex: 1; }
+  .set-row { flex-wrap: wrap; }
+  .set-row .main-col { flex-basis: 100%; }
+
+  /* Formlar alttan açılır */
+  dialog { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 18px 18px 0 0; max-height: 92vh; border-bottom: 0; }
+  .modal-body { max-height: 70vh; }
+  .modal-foot { padding-bottom: calc(env(safe-area-inset-bottom) + 14px); }
+  .modal-foot .btn { flex: 1; padding: 12px; }
+  .fields-2 { grid-template-columns: 1fr; }
+  .input, select.input { font-size: 16px; padding: 10px 12px; }
+  .toast { bottom: calc(env(safe-area-inset-bottom) + 150px); max-width: 90vw; text-align: center; }
+}
+
+/* Tablolar telefonda kart görünümüne geçer */
+.m-only { display: none; }
+@media (max-width: 760px) {
+  .m-only { display: inline; }
+  .d-only { display: none; }
+  .table-wrap:has(.m-cards) { overflow: visible; }
+  .m-cards thead { display: none; }
+  .m-cards, .m-cards tbody { display: block; }
+  .m-cards tr { display: grid; gap: 4px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+  .m-cards tr:last-child { border-bottom: 0; }
+  .m-cards td { padding: 0; border: 0; min-width: 0; }
+  .m-cards td.actions { width: auto; }
+
+  .tx-table tr { grid-template-columns: 1fr auto; grid-template-areas: "desc amt" "date act"; }
+  .tx-table .c-desc { grid-area: desc; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-table .c-date { grid-area: date; color: var(--muted); font-size: 12.5px; }
+  .tx-table .c-amt { grid-area: amt; }
+  .tx-table .c-act { grid-area: act; text-align: right; }
+  .tx-table .c-act .icon-btn { width: 34px; height: 30px; }
+
+  .rec-table tr { grid-template-columns: 1fr auto; grid-template-areas: "name amt" "date status" "act act"; }
+  .rec-table .c-name { grid-area: name; }
+  .rec-table .c-amt { grid-area: amt; }
+  .rec-table .c-date { grid-area: date; font-size: 13px; }
+  .rec-table .c-status { grid-area: status; text-align: right; }
+  .rec-table .c-act { grid-area: act; display: flex; gap: 6px; align-items: center; margin-top: 6px; text-align: left; }
+  .rec-table .c-act .btn { flex: 1; padding: 8px; }
+  .rec-table .c-act .icon-btn { width: 38px; height: 34px; border: 1px solid var(--line); }
+
+  .bud-table tr { grid-template-columns: 1fr 130px; grid-template-areas: "cat lim" "spent rem" "bar bar"; }
+  .bud-table .c-cat { grid-area: cat; font-weight: 600; }
+  .bud-table .c-lim { grid-area: lim; }
+  .bud-table .c-lim .input { width: 100% !important; padding: 7px 10px; }
+  .bud-table .c-spent { grid-area: spent; text-align: left; font-size: 13px; }
+  .bud-table .c-spent::before { content: "Harcanan "; color: var(--muted); }
+  .bud-table .c-rem { grid-area: rem; font-size: 13px; }
+  .bud-table .c-rem::before { content: "Kalan "; color: var(--muted); }
+  .bud-table .c-bar { grid-area: bar; }
+  .bud-table .c-bar:empty { display: none; }
+}
