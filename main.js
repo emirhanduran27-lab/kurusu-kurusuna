@@ -346,6 +346,12 @@ if (!gotLock) {
       try { await systemPreferences.promptTouchID(String(reason || 'Kilidi aç')); return true; } catch { return false; }
     });
     ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) shell.openExternal(url); });
+    ipcMain.handle('http:get', async (_e, url) => {
+      if (!/^https:\/\/(api\.frankfurter\.dev|api\.gold-api\.com)\//.test(url)) throw new Error('izin yok');
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     ipcMain.handle('deeplink:pending', () => { const u = pendingLink; pendingLink = null; return u; });
 
     createWindow();

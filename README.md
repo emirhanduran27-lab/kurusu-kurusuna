@@ -49,6 +49,9 @@ Program açılışta ve açık kaldığı sürece 6 saatte bir yeni sürüme bak
 - **Özet**: Ay seçimi, gelir, gider, birikime aktarılan ve ay sonu kalan; yaklaşan ödemeler, bütçe durumu, son 6 ay grafiği, kategori dağılımı.
 - **Hesaplar**: Nakit, banka, kredi kartı, birikim hesabı. Her hesabın ayrı bakiyesi, hesaplar arası transfer. Eski "ödeme yöntemi" kayıtları ilk açılışta hesaplara taşınır.
 - **Kredi kartı**: Limit, kullanılabilir limit, hesap kesim ve son ödeme günü, ekstre borcu, asgari ödeme, gelecek taksitler. "Kartı öde" ile bankadan karta ödeme. Kartla yapılan giderlerde taksit seçilebilir.
+- **Döviz ve Altın**: Dolar, euro, sterlin, frank, gram/22 ayar/çeyrek/yarım/tam/Cumhuriyet altını ve gümüş. Alış ve satışlar, ortalama maliyet, güncel kurla değer ve kâr/zarar. Kurlar ECB (günlük) ve gold-api.com'dan alınır, istenirse elle düzeltilir.
+- **Hızlı şablonlar**: Sık girilen harcamalar Özet ve İşlemler sayfasının üstünde tek dokunuşla eklenir, "Geri al" ile geri alınır.
+- **Bütçe uyarısı**: Bir kategoride aylık limitin %80'ine ve %100'üne ulaşınca bildirim.
 - **Borç ve Alacak**: Kime ne borçlusun, kim sana borçlu. Kısmi ödemeler, vade hatırlatması. Gider eklerken "Başkalarıyla bölüş" ile arkadaşların payı alacak olarak kaydedilir.
 - **İşlemler**: Gelir ve gider kayıtları. Arama, ay, tür, kategori ve ödeme yöntemine göre filtre. CSV (Excel) dışa aktarma.
 - **Düzenli Ödemeler**: Kira, fatura, abonelik, taksit, maaş gibi tekrarlayan kalemler. "Ödendi" deyince işlem olarak eklenir ve tarih ileri alınır. Açılışta yaklaşan ödemeler için Windows bildirimi gelir.

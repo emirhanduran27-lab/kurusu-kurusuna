@@ -82,6 +82,8 @@ function defaultData() {
     recurring: [],
     goals: [],
     debts: [],
+    assets: [],
+    templates: [],
     budgets: {}
   };
 }
@@ -114,7 +116,7 @@ function normalize(d) {
   d.categories.expense = d.categories.expense || def.categories.expense;
   if (!Array.isArray(d.accounts) || !d.accounts.length) migrateMethods(d);
   delete d.methods;
-  for (const k of ['transactions', 'transfers', 'recurring', 'goals', 'debts']) if (!Array.isArray(d[k])) d[k] = [];
+  for (const k of ['transactions', 'transfers', 'recurring', 'goals', 'debts', 'assets', 'templates']) if (!Array.isArray(d[k])) d[k] = [];
   d.budgets = d.budgets && typeof d.budgets === 'object' ? d.budgets : {};
   // Yedekten ya da eski sürümden gelen kayıtları güvenli hale getir
   const safeId = v => String(v ?? '').replace(/[^\w-]/g, '') || uid();
@@ -140,6 +142,10 @@ function normalize(d) {
   d.debts = d.debts.filter(x => num(x.amount) > 0 && okDate(x.date)).map(x => ({ ...x, id: safeId(x.id), amount: num(x.amount), dir: x.dir === 'owe' ? 'owe' : 'lent',
     person: String(x.person || 'Bilinmeyen'), accountId: x.accountId ? fixAcc(x.accountId) : null, due: okDate(x.due) ? x.due : '',
     payments: (Array.isArray(x.payments) ? x.payments : []).filter(p => okDate(p.date) && num(p.amount) > 0).map(p => ({ ...p, id: safeId(p.id), amount: num(p.amount), accountId: p.accountId ? fixAcc(p.accountId) : null })) }));
+  d.assets = d.assets.filter(l => ASSET_TYPES[l.type] && okDate(l.date) && Number.isFinite(num(l.qty)) && num(l.qty) !== 0 && num(l.price) > 0)
+    .map(l => ({ ...l, id: safeId(l.id), qty: Number(l.qty), price: num(l.price), accountId: l.accountId ? fixAcc(l.accountId) : null }));
+  d.templates = d.templates.filter(t => num(t.amount) > 0).map(t => ({ ...t, id: safeId(t.id), name: String(t.name || 'Şablon').slice(0, 24), type: t.type === 'income' ? 'income' : 'expense',
+    amount: num(t.amount), categoryId: safeId(t.categoryId), accountId: fixAcc(t.accountId) }));
   for (const k of Object.keys(d.budgets)) { const v = num(d.budgets[k]); if (!(v > 0)) delete d.budgets[k]; else d.budgets[k] = v; }
   return d;
 }
@@ -183,7 +189,7 @@ function upcomingReminders() {
   });
   return out.filter(n => n.at > Date.now()).sort((a, b) => a.at - b.at).slice(0, 60);
 }
-function commit() { persist(); render(); }
+function commit() { persist(); render(); checkBudgetAlerts(); }
 
 const allCats = () => [...S.data.categories.income, ...S.data.categories.expense];
 const catById = id => allCats().find(c => c.id === id) || { name: 'Kategorisiz', color: '#94a3b8' };
@@ -271,11 +277,17 @@ function paintBanner(b, u) {
   } else b.hidden = true;
 }
 
-function toast(msg) {
+function toast(msg, actionLabel, onAction) {
   const t = $('#toast');
   t.textContent = msg; t.hidden = false;
+  if (actionLabel) {
+    const b = document.createElement('button');
+    b.className = 'toast-act'; b.textContent = actionLabel;
+    b.onclick = () => { t.hidden = true; onAction(); };
+    t.append(b);
+  }
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { t.hidden = true; }, 2200);
+  toast._t = setTimeout(() => { t.hidden = true; }, actionLabel ? 5000 : 2200);
 }
 
 function destroyCharts() { S.charts.forEach(c => c.destroy()); S.charts = []; }
@@ -325,7 +337,7 @@ const AFTER = {};
 
 VIEWS.ozet = () => {
   const d = S.data;
-  if (!d.transactions.length && !d.recurring.length && !d.goals.length) {
+  if (!d.transactions.length && !d.recurring.length && !d.goals.length && !d.assets.length && !d.debts.length && !d.transfers.length) {
     return `<div class="page-head"><h1>Özet</h1></div>
     <div class="card welcome">
       <h2>Hoş geldin 👋</h2>
@@ -349,6 +361,7 @@ VIEWS.ozet = () => {
   const recent = [...d.transactions].sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0)).slice(0, 7);
 
   return `<div class="page-head"><h1>Özet</h1>${monthNav('ozet')}<div class="spacer"></div></div>
+  ${templateChips()}
   <div class="grid g4">
     <div class="card stat"><div class="label"><span class="dot" style="background:var(--income)"></span>Gelir</div><div class="value pos">${money(st.inc)}</div><div class="sub">Geçen ay ${money(prev.inc)}</div></div>
     <div class="card stat"><div class="label"><span class="dot" style="background:var(--expense)"></span>Gider</div><div class="value neg">${money(st.exp)}</div><div class="sub">${expDiff === null ? 'Geçen ay kayıt yok' : (expDiff >= 0 ? `Geçen aya göre %${expDiff} fazla` : `Geçen aya göre %${-expDiff} az`)}</div></div>
@@ -470,6 +483,7 @@ VIEWS.islemler = () => {
     <button class="btn" data-action="export-csv">CSV dışa aktar</button>
     <button class="btn btn-income" data-action="new-income">+ Gelir</button>
     <button class="btn btn-expense" data-action="new-expense">+ Gider</button></div>
+  ${templateChips()}
   <div class="toolbar">
     <input class="input" id="fQ" placeholder="Not veya kategoride ara…" value="${esc(f.q)}" style="width:230px">
     <select class="input" id="fMonth">
@@ -709,7 +723,7 @@ VIEWS.ayarlar = () => {
       <button data-action="rename-cat" data-id="${c.id}" title="Yeniden adlandır">✎</button>
       <button data-action="del-cat" data-id="${c.id}" data-type="${type}" title="Sil">✕</button>
     </span>`).join('');
-  const hasSample = d.transactions.some(t => t.sample) || d.goals.some(g => g.sample) || d.recurring.some(r => r.sample) || d.transfers.some(t => t.sample) || d.debts.some(x => x.sample);
+  const hasSample = d.transactions.some(t => t.sample) || d.goals.some(g => g.sample) || d.recurring.some(r => r.sample) || d.transfers.some(t => t.sample) || d.debts.some(x => x.sample) || d.assets.some(x => x.sample) || d.templates.some(x => x.sample);
   return `<div class="page-head"><h1>Ayarlar</h1></div>
   ${syncCardHtml()}
   <div class="grid g2 mt">
@@ -739,6 +753,7 @@ VIEWS.ayarlar = () => {
       <label class="switch"><input type="checkbox" id="sHide" ${s.hideAmounts ? 'checked' : ''}><span></span></label></div>
     <div class="set-row"><div class="main-col muted" style="font-size:12.5px">Kilit, programı açan başka birinin kayıtlarını görmesini engeller. Kilit ve gizleme ayarı her cihazın kendine aittir, yedek dosyalarına geçmez.</div></div>
   </div>
+  ${templatesCardHtml()}
   <div class="card mt"><h2>Gider kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="expense">+ Ekle</button></h2><div class="chips">${catChips('expense')}</div></div>
   <div class="card mt"><h2>Gelir kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="income">+ Ekle</button></h2><div class="chips">${catChips('income')}</div></div>
   <div class="card mt"><h2>Hesaplar<span class="spacer"></span><button class="btn btn-sm" data-goto="hesaplar">Hesapları yönet</button></h2>
@@ -756,6 +771,7 @@ AFTER.ayarlar = () => {
   $('#sCur').addEventListener('change', e => { S.data.settings.currency = e.target.value; commit(); });
   $('#sRem').addEventListener('change', e => { S.data.settings.reminderDays = Number(e.target.value); commit(); });
   $('#sHide').addEventListener('change', () => toggleHide());
+  $('#sBudgetAlert').addEventListener('change', e => { S.data.settings.budgetAlerts = e.target.checked; persist(); });
   $$('[data-color-cat]').forEach(inp => inp.addEventListener('change', () => {
     const c = allCats().find(x => x.id === inp.dataset.colorCat); if (c) { c.color = inp.value; persist(); }
   }));
@@ -842,14 +858,17 @@ function txForm(existing, presetType) {
         <label class="field"><span>Açıklama</span><input class="input" name="note" placeholder="Örn. Migros alışverişi" value="${esc(t.note)}"></label>
       </div>
       ${existing ? '' : txExtrasHtml()}
+      ${existing ? '' : '<label class="check"><input type="checkbox" name="asTpl"> Hızlı şablon olarak da kaydet</label>'}
       ${existing ? '' : '<label class="check"><input type="checkbox" name="again"> Kaydettikten sonra yeni kayıt aç</label>'}`,
     onOpen: f => { bindTypeSwitch(f); if (!existing) bindTxExtras(f); },
     onSubmit: f => {
       const amount = parseAmount(val(f, 'amount'));
       if (!(amount > 0)) return fieldError(f, 'amount', 'Geçerli bir tutar gir');
       const rec = { type: val(f, 'type'), amount, date: val(f, 'date'), categoryId: val(f, 'categoryId'), accountId: val(f, 'accountId'), note: val(f, 'note').trim() };
+      const tplSeed = !existing && f.elements.asTpl?.checked ? { name: (rec.note || catById(rec.categoryId).name).slice(0, 24), type: rec.type, amount: rec.amount, categoryId: rec.categoryId, accountId: rec.accountId, note: rec.note } : null;
       if (existing) Object.assign(existing, rec);
       else if (saveTxWithExtras(f, rec) === false) return false;
+      if (tplSeed) S.data.templates.push({ id: uid(), ...tplSeed });
       S.last[rec.type] = rec.categoryId; S.last.acc = rec.accountId;
       const again = !existing && f.elements.again?.checked;
       commit();
@@ -1395,6 +1414,8 @@ document.addEventListener('click', async e => {
       d.goals = d.goals.filter(g => !g.sample);
       d.transfers = d.transfers.filter(t => !t.sample);
       d.debts = d.debts.filter(x => !x.sample);
+      d.assets = d.assets.filter(x => !x.sample);
+      d.templates = d.templates.filter(x => !x.sample);
       commit(); return toast('Örnek veriler silindi');
     case 'wipe':
       return openModal({

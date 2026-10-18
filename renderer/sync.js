@@ -52,6 +52,8 @@ function toRecords(d) {
   d.recurring.forEach(x => put('rec', x.id, x));
   d.goals.forEach(x => put('goal', x.id, x));
   d.debts.forEach(x => put('debt', x.id, x));
+  d.assets.forEach(x => put('asset', x.id, x));
+  d.templates.forEach((x, i) => put('tpl', x.id, { ...x, _o: i }));
   d.accounts.forEach((x, i) => put('acc', x.id, { ...x, _o: i }));
   for (const t of ['income', 'expense']) d.categories[t].forEach((c, i) => put('cat', c.id, { ...c, _t: t, _o: i }));
   put('meta', 'budgets', d.budgets);
@@ -63,6 +65,7 @@ function applyRecords(d, r) {
   const strip = ({ _o, _t, ...x }) => x;
   const ord = (a, b) => (a._o ?? 0) - (b._o ?? 0);
   d.transactions = by('tx'); d.transfers = by('tr'); d.recurring = by('rec'); d.goals = by('goal'); d.debts = by('debt');
+  d.assets = by('asset'); d.templates = by('tpl').sort(ord).map(strip);
   const accs = by('acc').sort(ord).map(strip);
   if (accs.length) d.accounts = accs;
   const cats = by('cat');
@@ -146,7 +149,7 @@ async function syncNow() {
     }
     st.lastSync = Date.now();
     S.applyingRemote = true; persist(); S.applyingRemote = false;
-    if (changed) render();
+    if (changed) { render(); checkBudgetAlerts(); }
     setSyncStatus('ok');
   } catch (e) {
     S.applyingRemote = false;

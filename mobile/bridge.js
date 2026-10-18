@@ -1,6 +1,6 @@
 /* Telefon köprüsü: Capacitor içinde çalışırken masaüstündeki window.api ile aynı arayüzü sağlar.
    Masaüstünde (Electron) hiçbir şey yapmaz. esbuild ile renderer/vendor/mobile-bridge.js olarak paketlenir. */
-import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -129,6 +129,17 @@ if (Capacitor.isNativePlatform()) {
     },
     exportCsv: (csv, name) => shareFile(name || 'islemler.csv', '﻿' + csv, 'CSV paylaş'),
     notify: async () => false, // telefonda hatırlatmalar önceden planlandığı için anlık bildirim gerekmez
+    alert: async (title, body) => {
+      if (!(await notifPermission())) return false;
+      await LocalNotifications.schedule({ notifications: [{ id: 9000 + Math.floor(Math.random() * 900), title, body }] });
+      return true;
+    },
+    httpGet: async url => {
+      if (!/^https:\/\/(api\.frankfurter\.dev|api\.gold-api\.com)\//.test(url)) throw new Error('izin yok');
+      const r = await CapacitorHttp.get({ url, headers: { Accept: 'application/json' } });
+      if (r.status !== 200) throw new Error('HTTP ' + r.status);
+      return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+    },
     scheduleReminders: list => scheduleReminders(list),
     openDataFolder: async () => false,
     info: async () => { const i = await App.getInfo(); return { version: i.version, dataPath: 'Telefonun uygulama hafızası' }; },

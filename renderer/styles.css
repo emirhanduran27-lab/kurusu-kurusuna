@@ -428,6 +428,25 @@ body.locked .app { visibility: hidden; }
   .bud-table .c-bar:empty { display: none; }
 }
 
+/* Kurlar, şablonlar, geri al */
+.rates { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.rate { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; text-align: left; min-width: 120px; }
+.rate span { color: var(--muted); font-size: 12px; }
+.rate b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.rate small { color: var(--warn); font-size: 10.5px; font-weight: 700; }
+.rate-src { flex-basis: 100%; font-size: 11.5px; }
+.tpl-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 14px; scrollbar-width: none; }
+.tpl-row::-webkit-scrollbar { display: none; }
+.tpl-chip { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; padding: 8px 12px; border-radius: 20px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-weight: 600; font-size: 13px; }
+.tpl-chip b { color: var(--expense); font-weight: 700; }
+.tpl-chip.income b { color: var(--income); }
+.tpl-chip:hover { border-color: var(--accent); }
+.tpl-chip.ghost { color: var(--muted); }
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast[hidden] { display: none; }
+.toast-act { background: none; border: 0; color: var(--accent); font-weight: 800; cursor: pointer; padding: 0; font-size: 14px; }
+.hide-amounts .rate b, .hide-amounts .tpl-chip b { filter: blur(6px); }
+
 /* Hesap ve eşitleme */
 .oauth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 11px; background: var(--panel); }
 .g-logo { width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #4285f4; font-weight: 800; display: grid; place-items: center; font-size: 14px; }
@@ -463,4 +482,4 @@ body.locked .app { visibility: hidden; }
 .more-item small { color: var(--muted); }
 .more-item.active { border-color: var(--accent); }
 .hide-amounts .networth b { filter: blur(7px); }
-@media (max-width: 760px) { .split-row { grid-template-columns: 1fr 100px auto; } }
+@media (max-width: 760px) { .split-row { grid-template-columns: 1fr 100px auto; } .rate { flex: 1 1 calc(50% - 8px); min-width: 0; } }

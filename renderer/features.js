@@ -4,7 +4,7 @@
 
 const ACC_TYPES = { cash: 'Nakit', bank: 'Banka hesabı', card: 'Kredi kartı', savings: 'Birikim hesabı', other: 'Diğer' };
 const ACC_ICON = { cash: '💵', bank: '🏦', card: '💳', savings: '🐷', other: '👛' };
-const MORE_VIEWS = ['birikim', 'butce', 'borclar', 'ayarlar'];
+const MORE_VIEWS = ['birikim', 'varliklar', 'butce', 'borclar', 'ayarlar'];
 
 const accById = id => S.data.accounts.find(a => a.id === id);
 const accName = id => accById(id)?.name || 'Hesap yok';
@@ -19,6 +19,7 @@ function accountBalance(acc, upto = todayStr()) {
   for (const t of d.transactions) if (t.accountId === id && t.date <= upto) b += t.type === 'income' ? t.amount : -t.amount;
   for (const t of d.transfers) if (t.date <= upto) { if (t.to === id) b += t.amount; if (t.from === id) b -= t.amount; }
   for (const g of d.goals) for (const c of g.contributions) if (!c.initial && c.accountId === id && c.date <= upto) b -= c.amount;
+  for (const l of d.assets) if (l.accountId === id && l.date <= upto) b -= l.qty * l.price;
   for (const x of d.debts) {
     if (x.accountId === id && x.date <= upto) b += x.dir === 'lent' ? -x.amount : x.amount;
     for (const p of x.payments) if (p.accountId === id && p.date <= upto) b += x.dir === 'lent' ? p.amount : -p.amount;
@@ -90,8 +91,8 @@ function debtTotals() {
 // Özet sayfasındaki hesaplar ve net varlık kartı
 function accountsSummaryCard() {
   const accs = S.data.accounts.filter(a => !a.archived);
-  const dt = debtTotals(), saved = totalSaved(), bal = balance();
-  const net = round2(bal + saved + dt.lent - dt.owe);
+  const dt = debtTotals(), saved = totalSaved(), bal = balance(), av = assetsValue();
+  const net = round2(bal + saved + av + dt.lent - dt.owe);
   return `<div class="grid g2 mt">
     <div class="card">
       <h2>Hesaplar<span class="spacer"></span><a data-goto="hesaplar">Tümü</a></h2>
@@ -109,6 +110,7 @@ function accountsSummaryCard() {
       <div class="networth">
         <div><span>Hesaplar</span><b class="money">${money(bal)}</b></div>
         <div><span>Birikimler</span><b class="sav money">${money(saved)}</b></div>
+        ${av ? `<div><span>Döviz ve altın</span><b class="sav money">${money(av)}</b></div>` : ''}
         <div><span>Alacaklar</span><b class="pos money">${money(dt.lent)}</b></div>
         <div><span>Borçlar</span><b class="neg money">−${money(dt.owe)}</b></div>
         <div class="total"><span>Net varlık</span><b class="money">${money(net)}</b></div>
@@ -316,7 +318,8 @@ function accountUsage(id) {
   const d = S.data;
   return d.transactions.filter(t => t.accountId === id).length + d.transfers.filter(t => t.from === id || t.to === id).length
     + d.recurring.filter(r => r.accountId === id).length + d.debts.filter(x => x.accountId === id || x.payments.some(p => p.accountId === id)).length
-    + d.goals.reduce((s, g) => s + g.contributions.filter(c => c.accountId === id).length, 0);
+    + d.goals.reduce((s, g) => s + g.contributions.filter(c => c.accountId === id).length, 0)
+    + d.assets.filter(l => l.accountId === id).length + d.templates.filter(t => t.accountId === id).length;
 }
 
 function transferForm(existing, preset = {}) {
@@ -481,6 +484,7 @@ function moreMenu() {
     title: 'Diğer', noFoot: true,
     body: `<div class="more-list">
       ${item('birikim', '◎', 'Birikimler', 'Hedefler ve katkılar')}
+      ${item('varliklar', '🥇', 'Döviz ve Altın', 'Güncel kurla değer, kâr ve zarar')}
       ${item('borclar', '⇆', 'Borç ve Alacak', 'Kime ne borçlusun, kim sana borçlu')}
       ${item('butce', '▤', 'Bütçe ve Raporlar', 'Limitler, grafikler, yıllık özet')}
       ${item('ayarlar', '⚙', 'Ayarlar', 'Güvenlik, yedek, kategoriler')}
@@ -546,6 +550,13 @@ function sampleExtras(d, now, ex) {
     if (debt > 0) d.transfers.push({ id: uid(), created: Date.now(), sample: true, from: 'a-bank', to: 'a-card', amount: round2(debt), date: ymd(new Date(now.getFullYear(), now.getMonth() - m, 24)), note: 'Kart ödemesi' });
   }
   d.transfers.push({ id: uid(), created: Date.now(), sample: true, from: 'a-bank', to: 'a-cash', amount: 1000, date: ymd(new Date(now.getFullYear(), now.getMonth(), Math.max(1, now.getDate() - 3))), note: 'ATM çekimi' });
+  // Döviz, altın ve şablon örnekleri
+  const ago = m => ymd(new Date(now.getFullYear(), now.getMonth() - m, 12));
+  d.assets.push({ id: uid(), created: Date.now(), sample: true, type: 'USD', qty: 500, price: 41.2, date: ago(5), accountId: null });
+  d.assets.push({ id: uid(), created: Date.now(), sample: true, type: 'GA', qty: 10, price: 4350, date: ago(3), accountId: 'a-bank' });
+  d.assets.push({ id: uid(), created: Date.now(), sample: true, type: 'CEYREK', qty: 2, price: 7600, date: ago(1), accountId: null });
+  [['Kahve', 85, 'Yeme İçme', 'a-card'], ['Otobüs', 27, 'Ulaşım', 'a-cash'], ['Simit', 20, 'Yeme İçme', 'a-cash']].forEach(([name, amount, cat, acc]) =>
+    d.templates.push({ id: uid(), sample: true, name, type: 'expense', amount, categoryId: ex(cat), accountId: acc, note: name }));
   const due = new Date(now); due.setDate(due.getDate() + 10);
   d.debts.push({ id: uid(), created: Date.now(), sample: true, person: 'Zeynep', dir: 'lent', amount: 1200, date: ymd(new Date(now.getFullYear(), now.getMonth(), 1)), due: '', accountId: 'a-bank', note: 'Konser bileti', payments: [{ id: uid(), date: todayStr(), amount: 400, accountId: 'a-bank' }] });
   d.debts.push({ id: uid(), created: Date.now(), sample: true, person: 'Mert', dir: 'owe', amount: 2500, date: ymd(new Date(now.getFullYear(), now.getMonth() - 1, 20)), due: ymd(due), accountId: 'a-bank', note: 'Tatil masrafı', payments: [] });
