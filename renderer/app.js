@@ -1301,6 +1301,12 @@ document.addEventListener('click', async e => {
   }
 });
 
+window.addEventListener('kk-back', e => {
+  if (S.locked) return;
+  if ($('#modal').open) { $('#modal').close(); e.preventDefault(); return; }
+  if (S.view !== 'ozet') { S.view = 'ozet'; render(); e.preventDefault(); }
+});
+
 document.addEventListener('keydown', e => {
   if (S.locked || $('#modal').open || e.ctrlKey || e.metaKey || e.altKey) return;
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName)) return;

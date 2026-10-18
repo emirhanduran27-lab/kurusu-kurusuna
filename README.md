@@ -1,6 +1,6 @@
 # Kuruşu Kuruşuna
 
-Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows ve Mac masaüstü uygulaması. Eski adı "Gelir Gider".
+Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows, Mac, Android ve iPhone uygulaması. Eski adı "Gelir Gider".
 
 ## Kurulum
 
@@ -18,6 +18,20 @@ xattr -cr "/Applications/Kuruşu Kuruşuna.app"
 ```
 Program Uygulamalar klasöründen çalışmalı. Doğrudan `.dmg` içinden açılırsa kendini güncelleyemez.
 
+**Android:** `KurusuKurusuna-x.y.z-android.apk` dosyasını telefondan indirip aç. Telefon "bilinmeyen kaynaklardan yükleme" izni isterse tarayıcıya bu izni ver. Yeni sürüm çıkınca uygulama haber verir, dokununca yeni APK iner.
+
+**iPhone:** Apple geliştirici hesabı aktif olunca TestFlight ya da App Store üzerinden dağıtılacak.
+
+## Telefon ile bilgisayar arasında veri aktarma
+
+Veriler her cihazda ayrı tutulur. Aktarmak için Ayarlar → Yedek al (telefonda Paylaş) ile yedek dosyası oluştur, diğer cihazda Ayarlar → Yedekten geri yükle ile aç. Kilit ve gizleme ayarı her cihazın kendine aittir, yedekle taşınmaz.
+
+## Güvenlik ve gizlilik
+
+- **Uygulama kilidi (isteğe bağlı):** Ayarlar → Güvenlik ve gizlilik bölümünden PIN ya da parola seçilir. PIN ya da parola düz metin olarak saklanmaz. Mac'te Touch ID, telefonda Face ID ya da parmak izi ile de açılabilir. Telefonda uygulama bir dakikadan uzun arka planda kalırsa yeniden kilitlenir. Beş yanlış denemeden sonra bekleme süresi başlar.
+- **Unutulursa:** Güvenlik gereği sıfırlanamaz. Kilidi kaldırmanın tek yolu o cihazdaki verileri silmek. Sonra yedek dosyasından geri yüklenebilir.
+- **Tutarları gizle:** Göz simgesi ya da `H` tuşu tüm rakamları bulanıklaştırır.
+
 ## Güncellemeler
 
 Program açılışta ve açık kaldığı sürece 6 saatte bir yeni sürüme bakar. Yeni sürüm varsa arka planda iner, sol altta "Güncelleme geldi" kutusu çıkar. İnince kutu yeşile döner. Program kapanınca güncelleme sessizce kurulur, istenirse kutuya tıklayıp hemen kurulabilir. Kurulum sihirbazı açılmaz, veriler korunur. Windows ve Mac'te aynı şekilde çalışır.
@@ -31,7 +45,7 @@ Program açılışta ve açık kaldığı sürece 6 saatte bir yeni sürüme bak
 - **Bütçe ve Raporlar**: Kategori başına aylık limit, geçen ay ve 6 aylık ortalama ile karşılaştırma, yıllık grafikler.
 - **Ayarlar**: Tema, para birimi, kategoriler, yedekleme ve güncellemeler.
 
-Kısayollar: `G` yeni gelir, `N` yeni gider.
+Kısayollar: `G` yeni gelir, `N` yeni gider, `H` tutarları gizle.
 
 ## Veriler
 
@@ -41,8 +55,11 @@ Tüm veriler bilgisayarda kalır. Windows'ta `%APPDATA%\Kuruşu Kuruşuna\veri.j
 
 ```
 npm install
-npm start
+npm start              # masaüstü
+npm run mobile:sync    # telefon projelerini güncelle (android/ ve ios/)
 ```
+
+Telefon arayüzü masaüstüyle aynı `renderer/` klasörünü kullanır. `mobile/bridge.js` telefonda dosya kaydı, paylaşma, bildirim ve biyometrik için köprü görevi görür, `npm run bridge` ile paketlenir.
 
 ## Yeni sürüm yayınlama
 

@@ -1,6 +1,6 @@
 /* Telefon köprüsü: Capacitor içinde çalışırken masaüstündeki window.api ile aynı arayüzü sağlar.
    Masaüstünde (Electron) hiçbir şey yapmaz. esbuild ile renderer/vendor/mobile-bridge.js olarak paketlenir. */
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -157,6 +157,20 @@ if (Capacitor.isNativePlatform()) {
   };
 
   document.documentElement.classList.add('native', `native-${platform}`);
+
+  // Durum çubuğu yazılarının rengi temaya uysun
+  const syncBars = () => {
+    const light = document.documentElement.dataset.theme === 'light';
+    SystemBars.setStyle({ style: light ? SystemBarsStyle.Light : SystemBarsStyle.Dark }).catch(() => {});
+  };
+  new MutationObserver(syncBars).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  syncBars();
+
+  // Android geri tuşu: önce açık formu kapatır, sonra Özet'e döner, en son uygulamadan çıkar
+  App.addListener('backButton', () => {
+    const ev = new CustomEvent('kk-back', { cancelable: true });
+    if (window.dispatchEvent(ev)) App.exitApp();
+  });
   if (platform === 'android') {
     setTimeout(checkUpdate, 5000);
     setInterval(checkUpdate, 6 * 60 * 60 * 1000);

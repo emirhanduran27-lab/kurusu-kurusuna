@@ -3,9 +3,20 @@
   "appName": "Kuruşu Kuruşuna",
   "webDir": "renderer",
   "backgroundColor": "#0f1419",
-  "android": { "allowMixedContent": false },
-  "ios": { "contentInset": "never" },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
   "plugins": {
-    "LocalNotifications": { "iconColor": "#3fb68b" }
+    "LocalNotifications": {
+      "iconColor": "#3fb68b"
+    },
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover",
+      "style": "DARK"
+    }
   }
 }
