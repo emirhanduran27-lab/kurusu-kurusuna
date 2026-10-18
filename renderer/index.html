@@ -24,8 +24,10 @@
       <nav class="nav" id="nav">
         <button data-view="ozet" class="active"><span class="ico">◧</span>Özet</button>
         <button data-view="islemler"><span class="ico">⇅</span>İşlemler</button>
+        <button data-view="hesaplar"><span class="ico">▣</span>Hesaplar</button>
         <button data-view="duzenli"><span class="ico">↻</span>Düzenli Ödemeler<span class="nav-badge" id="dueBadge" hidden></span></button>
         <button data-view="birikim"><span class="ico">◎</span>Birikimler</button>
+        <button data-view="borclar"><span class="ico">⇆</span>Borç ve Alacak</button>
         <button data-view="butce"><span class="ico">▤</span>Bütçe ve Raporlar</button>
         <button data-view="ayarlar"><span class="ico">⚙</span>Ayarlar</button>
       </nav>
@@ -53,9 +55,9 @@
     <nav class="tabbar">
       <button data-view="ozet"><span>◧</span>Özet</button>
       <button data-view="islemler"><span>⇅</span>İşlemler</button>
+      <button data-view="hesaplar"><span>▣</span>Hesaplar</button>
       <button data-view="duzenli"><span>↻</span>Ödemeler<i class="tab-badge" id="mDueBadge" hidden></i></button>
-      <button data-view="birikim"><span>◎</span>Birikim</button>
-      <button data-view="butce"><span>▤</span>Bütçe</button>
+      <button data-action="more-menu"><span>☰</span>Diğer</button>
     </nav>
     <button class="fab" data-action="quick-add" aria-label="Yeni kayıt">+</button>
   </div>
@@ -91,5 +93,7 @@
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/mobile-bridge.js"></script>
   <script src="app.js"></script>
+  <script src="features.js"></script>
+  <script src="boot.js"></script>
 </body>
 </html>

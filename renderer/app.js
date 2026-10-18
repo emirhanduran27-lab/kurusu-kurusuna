@@ -76,12 +76,34 @@ function defaultData() {
       income: mk(['Maaş', 'Burs', 'Ek Gelir / Serbest', 'Kira Geliri', 'Yatırım Getirisi', 'Hediye', 'Diğer Gelir'], 'i'),
       expense: mk(['Kira', 'Market', 'Faturalar', 'Ulaşım', 'Yeme İçme', 'Sağlık', 'Eğitim', 'Giyim', 'Eğlence', 'Abonelikler', 'Kredi / Taksit', 'Kişisel Bakım', 'Teknoloji', 'Ev Eşyası', 'Diğer Gider'], 'e')
     },
-    methods: ['Nakit', 'Banka Kartı', 'Kredi Kartı', 'Havale / EFT'],
+    accounts: defaultAccounts(),
     transactions: [],
+    transfers: [],
     recurring: [],
     goals: [],
+    debts: [],
     budgets: {}
   };
+}
+function defaultAccounts() {
+  return [
+    { id: 'a-cash', name: 'Nakit', type: 'cash', opening: 0, color: '#3fb68b' },
+    { id: 'a-bank', name: 'Banka hesabı', type: 'bank', opening: 0, color: '#5aa9e6' },
+    { id: 'a-card', name: 'Kredi kartı', type: 'card', opening: 0, color: '#ef6461', limit: 0, statementDay: null, dueDay: null, minRate: 20 }
+  ];
+}
+// Eski sürümlerdeki "ödeme yöntemi" yazılarını hesaplara çevirir
+const METHOD_TO_ACCOUNT = { 'Nakit': 'a-cash', 'Banka Kartı': 'a-bank', 'Havale / EFT': 'a-bank', 'Kredi Kartı': 'a-card' };
+function migrateMethods(d) {
+  d.accounts = defaultAccounts();
+  const map = { ...METHOD_TO_ACCOUNT };
+  (Array.isArray(d.methods) ? d.methods : []).forEach(m => {
+    if (!map[m] && m) { const id = 'a-' + uid(); map[m] = id; d.accounts.push({ id, name: String(m), type: 'other', opening: 0, color: '#94a3b8' }); }
+  });
+  const pick = m => map[m] || 'a-bank';
+  (d.transactions || []).forEach(t => { if (!t.accountId) t.accountId = pick(t.method); });
+  (d.recurring || []).forEach(r => { if (!r.accountId) r.accountId = pick(r.method); });
+  (d.goals || []).forEach(g => (g.contributions || []).forEach(c => { if (!c.initial && !c.accountId) c.accountId = 'a-bank'; }));
 }
 function normalize(d) {
   const def = defaultData();
@@ -90,8 +112,9 @@ function normalize(d) {
   d.categories = d.categories || def.categories;
   d.categories.income = d.categories.income || def.categories.income;
   d.categories.expense = d.categories.expense || def.categories.expense;
-  d.methods = Array.isArray(d.methods) && d.methods.length ? d.methods : def.methods;
-  for (const k of ['transactions', 'recurring', 'goals']) if (!Array.isArray(d[k])) d[k] = [];
+  if (!Array.isArray(d.accounts) || !d.accounts.length) migrateMethods(d);
+  delete d.methods;
+  for (const k of ['transactions', 'transfers', 'recurring', 'goals', 'debts']) if (!Array.isArray(d[k])) d[k] = [];
   d.budgets = d.budgets && typeof d.budgets === 'object' ? d.budgets : {};
   // Yedekten ya da eski sürümden gelen kayıtları güvenli hale getir
   const safeId = v => String(v ?? '').replace(/[^\w-]/g, '') || uid();
@@ -103,6 +126,20 @@ function normalize(d) {
   d.recurring = d.recurring.filter(r => num(r.amount) > 0).map(r => ({ ...r, id: safeId(r.id), amount: num(r.amount), categoryId: safeId(r.categoryId), nextDate: okDate(r.nextDate) ? r.nextDate : null, frequency: FREQ[r.frequency] ? r.frequency : 'monthly' }));
   d.goals = d.goals.filter(g => num(g.target) > 0).map(g => ({ ...g, id: safeId(g.id), target: num(g.target), color: safeColor(g.color),
     contributions: (Array.isArray(g.contributions) ? g.contributions : []).filter(c => okDate(c.date) && Number.isFinite(num(c.amount))).map(c => ({ ...c, id: safeId(c.id), amount: num(c.amount) })) }));
+  const ACC_TYPES = ['cash', 'bank', 'card', 'savings', 'other'];
+  d.accounts = d.accounts.map(a => ({ ...a, id: safeId(a.id), name: String(a.name || 'Hesap'), type: ACC_TYPES.includes(a.type) ? a.type : 'other', color: safeColor(a.color),
+    opening: Number.isFinite(num(a.opening)) ? num(a.opening) : 0, limit: num(a.limit) > 0 ? num(a.limit) : 0,
+    statementDay: a.statementDay >= 1 && a.statementDay <= 31 ? Math.round(a.statementDay) : null, dueDay: a.dueDay >= 1 && a.dueDay <= 31 ? Math.round(a.dueDay) : null,
+    minRate: num(a.minRate) > 0 ? num(a.minRate) : 20 }));
+  const accIds = new Set(d.accounts.map(a => a.id));
+  const fixAcc = v => { const id = safeId(v); return accIds.has(id) ? id : d.accounts[0].id; };
+  d.transactions.forEach(t => { t.accountId = fixAcc(t.accountId); });
+  d.recurring.forEach(r => { r.accountId = fixAcc(r.accountId); });
+  d.goals.forEach(g => g.contributions.forEach(c => { if (!c.initial) c.accountId = fixAcc(c.accountId); }));
+  d.transfers = d.transfers.filter(t => okDate(t.date) && num(t.amount) > 0).map(t => ({ ...t, id: safeId(t.id), amount: num(t.amount), from: fixAcc(t.from), to: fixAcc(t.to) }));
+  d.debts = d.debts.filter(x => num(x.amount) > 0 && okDate(x.date)).map(x => ({ ...x, id: safeId(x.id), amount: num(x.amount), dir: x.dir === 'owe' ? 'owe' : 'lent',
+    person: String(x.person || 'Bilinmeyen'), accountId: x.accountId ? fixAcc(x.accountId) : null, due: okDate(x.due) ? x.due : '',
+    payments: (Array.isArray(x.payments) ? x.payments : []).filter(p => okDate(p.date) && num(p.amount) > 0).map(p => ({ ...p, id: safeId(p.id), amount: num(p.amount), accountId: p.accountId ? fixAcc(p.accountId) : null })) }));
   for (const k of Object.keys(d.budgets)) { const v = num(d.budgets[k]); if (!(v > 0)) delete d.budgets[k]; else d.budgets[k] = v; }
   return d;
 }
@@ -111,7 +148,7 @@ const S = {
   data: null,
   view: 'ozet',
   month: monthOf(todayStr()),
-  tx: { month: monthOf(todayStr()), type: 'all', cat: 'all', method: 'all', q: '' },
+  tx: { month: monthOf(todayStr()), type: 'all', cat: 'all', acc: 'all', q: '' },
   year: new Date().getFullYear(),
   charts: [],
   last: {},
@@ -136,6 +173,12 @@ function upcomingReminders() {
     const amount = s.hideAmounts || s.lock ? '' : ` (${money(r.amount)})`;
     out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${r.name}${amount} ${fmtDate(r.nextDate)} tarihinde.` });
     out.push({ at: at(r.nextDate, 10).getTime(), title: 'Bugün ödeme günü', body: `${r.name}${amount} bugün ödenecek.` });
+  });
+  extraDueItems().forEach(x => {
+    const amount = s.hideAmounts || s.lock ? '' : ` (${money(x.amount)})`;
+    const before = parseDate(x.date); before.setDate(before.getDate() - (s.reminderDays || 3));
+    out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${x.name}${amount} ${fmtDate(x.date)} tarihinde.` });
+    out.push({ at: at(x.date, 10).getTime(), title: 'Bugün son ödeme günü', body: `${x.name}${amount} bugün.` });
   });
   return out.filter(n => n.at > Date.now()).sort((a, b) => a.at - b.at).slice(0, 60);
 }
@@ -168,9 +211,7 @@ function goalSaved(g) { return round2(g.contributions.reduce((s, c) => s + c.amo
 function totalSaved() { return round2(S.data.goals.reduce((s, g) => s + goalSaved(g), 0)); }
 function savedFromBalance() { return round2(S.data.goals.reduce((s, g) => s + g.contributions.reduce((a, c) => a + (c.initial ? 0 : c.amount), 0), 0)); }
 function balance() {
-  let b = 0;
-  S.data.transactions.forEach(t => { b += t.type === 'income' ? t.amount : -t.amount; });
-  return round2(b - savedFromBalance());
+  return round2(S.data.accounts.reduce((s, a) => s + accountBalance(a), 0));
 }
 function dueList(daysAhead = 30) {
   return S.data.recurring
@@ -254,7 +295,7 @@ function render() {
   destroyCharts();
   document.documentElement.dataset.theme = S.data.settings.theme;
   chartDefaults();
-  $$('#nav button, .tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view));
+  $$('#nav button, .tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view || (b.dataset.action === 'more-menu' && MORE_VIEWS.includes(S.view))));
   const due = dueList(S.data.settings.reminderDays || 3).filter(r => r.type !== 'income').length;
   for (const id of ['#dueBadge', '#mDueBadge']) { const badge = $(id); badge.hidden = !due; badge.textContent = due; }
   $('#brandBalance').textContent = 'Bakiye: ' + money(balance());
@@ -324,13 +365,15 @@ VIEWS.ozet = () => {
           ${dueBadge(r)}
           <div class="amt ${r.type === 'income' ? 'pos' : 'neg'}">${money(r.amount)}</div>
           <button class="btn btn-sm" data-action="pay" data-id="${r.id}">${r.type === 'income' ? 'Alındı' : 'Öde'}</button>
-        </div>`).join('')}</div>` : '<div class="empty">Önümüzdeki 30 günde düzenli ödeme yok.</div>'}
+        </div>`).join('')}${extraDueItems(30).map(dueExtraRow).join('')}</div>` : (extraDueItems(30).length ? `<div class="list">${extraDueItems(30).map(dueExtraRow).join('')}</div>` : '<div class="empty">Önümüzdeki 30 günde ödeme yok.</div>')}
     </div>
     <div class="card">
       <h2>Bütçe durumu<span class="spacer"></span><a data-goto="butce">Düzenle</a></h2>
       ${budgetRows.length ? budgetRows.map(b => budgetLine(b.c, b.spent, b.lim)).join('') : '<div class="empty">Henüz bütçe limiti yok.<br><button class="btn btn-sm" data-goto="butce">Bütçe belirle</button></div>'}
     </div>
   </div>
+
+  ${accountsSummaryCard()}
 
   <div class="grid g-21 mt">
     <div class="card"><h2>Son 6 ay</h2><div class="chart-box"><canvas id="chTrend"></canvas></div></div>
@@ -356,7 +399,7 @@ function txRow(t) {
   const c = catById(t.categoryId);
   return `<div class="row">
     <span class="dot" style="background:${c.color}"></span>
-    <div class="main-col"><div class="title">${esc(t.note || c.name)}</div><div class="meta">${fmtDate(t.date)} · ${esc(c.name)}${t.method ? ' · ' + esc(t.method) : ''}</div></div>
+    <div class="main-col"><div class="title">${esc(t.note || c.name)}</div><div class="meta">${fmtDate(t.date)} · ${esc(c.name)} · ${esc(accName(t.accountId))}</div></div>
     <div class="amt ${t.type === 'income' ? 'pos' : 'neg'}">${t.type === 'income' ? '+' : '−'}${money(t.amount)}</div>
   </div>`;
 }
@@ -411,13 +454,14 @@ function filteredTx() {
     (f.month === 'all' || monthOf(t.date) === f.month) &&
     (f.type === 'all' || t.type === f.type) &&
     (f.cat === 'all' || t.categoryId === f.cat) &&
-    (f.method === 'all' || t.method === f.method) &&
+    (f.acc === 'all' || t.accountId === f.acc) &&
     (!q || (t.note || '').toLocaleLowerCase('tr').includes(q) || catById(t.categoryId).name.toLocaleLowerCase('tr').includes(q))
-  ).sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0));
+  ).filter(() => f.type !== 'transfer').sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0));
 }
 
 VIEWS.islemler = () => {
-  const f = S.tx, list = filteredTx();
+  const f = S.tx, list = filteredTx(), trs = filteredTransfers();
+  const rows = [...list.map(t => ({ k: 'tx', t })), ...trs.map(t => ({ k: 'tr', t }))].sort((a, b) => b.t.date.localeCompare(a.t.date) || (b.t.created || 0) - (a.t.created || 0));
   let inc = 0, exp = 0;
   list.forEach(t => { if (t.type === 'income') inc += t.amount; else exp += t.amount; });
   const catOpts = (type) => catsOf(type).map(c => `<option value="${c.id}" ${f.cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
@@ -435,26 +479,27 @@ VIEWS.islemler = () => {
       <option value="all">Tüm türler</option>
       <option value="income" ${f.type === 'income' ? 'selected' : ''}>Gelirler</option>
       <option value="expense" ${f.type === 'expense' ? 'selected' : ''}>Giderler</option>
+      <option value="transfer" ${f.type === 'transfer' ? 'selected' : ''}>Transferler</option>
     </select>
     <select class="input" id="fCat">
       <option value="all">Tüm kategoriler</option>
       ${f.type !== 'expense' ? `<optgroup label="Gelir">${catOpts('income')}</optgroup>` : ''}
       ${f.type !== 'income' ? `<optgroup label="Gider">${catOpts('expense')}</optgroup>` : ''}
     </select>
-    <select class="input" id="fMethod">
-      <option value="all">Tüm ödeme yöntemleri</option>
-      ${S.data.methods.map(m => `<option ${f.method === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}
+    <select class="input" id="fAcc">
+      <option value="all">Tüm hesaplar</option>
+      ${S.data.accounts.map(a => `<option value="${a.id}" ${f.acc === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
     </select>
-    ${(f.q || f.type !== 'all' || f.cat !== 'all' || f.method !== 'all') ? '<button class="btn btn-sm btn-ghost" data-action="clear-filters">Filtreleri temizle</button>' : ''}
+    ${(f.q || f.type !== 'all' || f.cat !== 'all' || f.acc !== 'all') ? '<button class="btn btn-sm btn-ghost" data-action="clear-filters">Filtreleri temizle</button>' : ''}
   </div>
-  <div class="summary-line"><span><b>${list.length}</b> kayıt</span><span>Gelir <b class="pos">${money(inc)}</b></span><span>Gider <b class="neg">${money(exp)}</b></span><span>Fark <b>${money(inc - exp)}</b></span></div>
-  ${list.length ? `<div class="table-wrap"><table class="m-cards tx-table">
-    <thead><tr><th>Tarih</th><th>Açıklama</th><th class="col-hide-m">Kategori</th><th class="col-hide-m">Yöntem</th><th class="num">Tutar</th><th></th></tr></thead>
-    <tbody>${list.map(t => { const c = catById(t.categoryId); return `<tr>
+  <div class="summary-line"><span><b>${rows.length}</b> kayıt</span><span>Gelir <b class="pos">${money(inc)}</b></span><span>Gider <b class="neg">${money(exp)}</b></span><span>Fark <b>${money(inc - exp)}</b></span></div>
+  ${rows.length ? `<div class="table-wrap"><table class="m-cards tx-table">
+    <thead><tr><th>Tarih</th><th>Açıklama</th><th class="col-hide-m">Kategori</th><th class="col-hide-m">Hesap</th><th class="num">Tutar</th><th></th></tr></thead>
+    <tbody>${rows.map(({ k, t }) => { if (k === 'tr') return transferRow(t); const c = catById(t.categoryId); return `<tr>
       <td class="c-date">${fmtDate(t.date)}<span class="m-only"> · ${esc(c.name)}</span></td>
-      <td class="c-desc">${esc(t.note) || `<span class="muted d-only">—</span><span class="m-only">${esc(c.name)}</span>`}${t.recurringId ? ' <span class="badge" title="Düzenli ödemeden">↻</span>' : ''}</td>
+      <td class="c-desc">${esc(t.note) || `<span class="muted d-only">—</span><span class="m-only">${esc(c.name)}</span>`}${t.recurringId ? ' <span class="badge" title="Düzenli ödemeden">↻</span>' : ''}${t.inst ? ` <span class="badge" title="Taksit">${t.inst.i}/${t.inst.n}</span>` : ''}${t.splitTotal ? ` <span class="badge" title="Bölüşüldü, toplam ${money(t.splitTotal)}">bölüşüldü</span>` : ''}</td>
       <td class="col-hide-m"><span class="cat"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span></td>
-      <td class="muted col-hide-m">${esc(t.method || '')}</td>
+      <td class="muted col-hide-m">${esc(accName(t.accountId))}</td>
       <td class="num c-amt ${t.type === 'income' ? 'pos' : 'neg'}"><b>${t.type === 'income' ? '+' : '−'}${money(t.amount)}</b></td>
       <td class="actions c-act"><button class="icon-btn" data-action="edit-tx" data-id="${t.id}" title="Düzenle">✎</button><button class="icon-btn danger" data-action="del-tx" data-id="${t.id}" title="Sil">🗑</button></td>
     </tr>`; }).join('')}</tbody></table></div>` : '<div class="card empty">Bu filtrelere uyan işlem yok.</div>'}`;
@@ -465,7 +510,7 @@ AFTER.islemler = () => {
   $('#fMonth').addEventListener('change', e => { S.tx.month = e.target.value; render(); });
   $('#fType').addEventListener('change', e => { S.tx.type = e.target.value; S.tx.cat = 'all'; render(); });
   $('#fCat').addEventListener('change', e => { S.tx.cat = e.target.value; render(); });
-  $('#fMethod').addEventListener('change', e => { S.tx.method = e.target.value; render(); });
+  $('#fAcc').addEventListener('change', e => { S.tx.acc = e.target.value; render(); });
 };
 
 /* Düzenli ödemeler */
@@ -605,7 +650,7 @@ VIEWS.butce = () => {
 
   <div class="grid g2 mt">
     <div class="card"><h2>${S.year} kategori bazında giderler</h2><div class="chart-box tall"><canvas id="chYearCats"></canvas></div></div>
-    <div class="card"><h2>Ödeme yöntemlerine göre (${monthLabel(S.month)})</h2><div class="chart-box tall"><canvas id="chMethods"></canvas></div></div>
+    <div class="card"><h2>Hesaplara göre giderler (${monthLabel(S.month)})</h2><div class="chart-box tall"><canvas id="chMethods"></canvas></div></div>
   </div>`;
 };
 AFTER.butce = () => {
@@ -645,7 +690,7 @@ AFTER.butce = () => {
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => money(c.raw) } } }, scales: { x: { ticks: { callback: moneyTick } }, y: { grid: { display: false } } } }
   });
   const mm = {};
-  txInMonth(S.month).filter(t => t.type === 'expense').forEach(t => { const k = t.method || 'Belirtilmedi'; mm[k] = (mm[k] || 0) + t.amount; });
+  txInMonth(S.month).filter(t => t.type === 'expense').forEach(t => { const k = accName(t.accountId); mm[k] = (mm[k] || 0) + t.amount; });
   const mms = Object.entries(mm).sort((a, b) => b[1] - a[1]);
   makeChart($('#chMethods'), {
     type: 'doughnut',
@@ -663,7 +708,7 @@ VIEWS.ayarlar = () => {
       <button data-action="rename-cat" data-id="${c.id}" title="Yeniden adlandır">✎</button>
       <button data-action="del-cat" data-id="${c.id}" data-type="${type}" title="Sil">✕</button>
     </span>`).join('');
-  const hasSample = d.transactions.some(t => t.sample) || d.goals.some(g => g.sample) || d.recurring.some(r => r.sample);
+  const hasSample = d.transactions.some(t => t.sample) || d.goals.some(g => g.sample) || d.recurring.some(r => r.sample) || d.transfers.some(t => t.sample) || d.debts.some(x => x.sample);
   return `<div class="page-head"><h1>Ayarlar</h1></div>
   <div class="grid g2">
     <div class="card">
@@ -694,8 +739,8 @@ VIEWS.ayarlar = () => {
   </div>
   <div class="card mt"><h2>Gider kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="expense">+ Ekle</button></h2><div class="chips">${catChips('expense')}</div></div>
   <div class="card mt"><h2>Gelir kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="income">+ Ekle</button></h2><div class="chips">${catChips('income')}</div></div>
-  <div class="card mt"><h2>Ödeme yöntemleri<span class="spacer"></span><button class="btn btn-sm" data-action="add-method">+ Ekle</button></h2>
-    <div class="chips">${d.methods.map((m, i) => `<span class="chip">${esc(m)}<button data-action="del-method" data-i="${i}" title="Sil">✕</button></span>`).join('')}</div></div>
+  <div class="card mt"><h2>Hesaplar<span class="spacer"></span><button class="btn btn-sm" data-goto="hesaplar">Hesapları yönet</button></h2>
+    <div class="chips">${d.accounts.filter(a => !a.archived).map(a => `<span class="chip" style="padding-right:10px"><span class="dot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div></div>
   <div class="card mt"><h2>Güncellemeler</h2>
     <div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
       <button class="btn" data-action="open-repo">GitHub sayfası</button>
@@ -751,8 +796,10 @@ function fieldError(f, n, msg) { const el = f.elements[n]; el.setCustomValidity(
 function catSelect(type, sel, name = 'categoryId') {
   return `<select class="input" name="${name}">${catsOf(type).map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`;
 }
-function methodSelect(sel) {
-  return `<select class="input" name="method"><option value="">Belirtilmedi</option>${S.data.methods.map(m => `<option ${m === sel ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>`;
+function accountSelect(sel, name = 'accountId', exclude) {
+  const list = S.data.accounts.filter(a => (!a.archived || a.id === sel) && a.id !== exclude);
+  const pick = list.some(a => a.id === sel) ? sel : (list.find(a => a.type === 'bank') || list[0])?.id;
+  return `<select class="input" name="${name}">${list.map(a => `<option value="${a.id}" ${a.id === pick ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select>`;
 }
 function typeSeg(type) {
   return `<div class="seg">
@@ -770,7 +817,7 @@ function bindTypeSwitch(f) {
 /* İşlem formu */
 function txForm(existing, presetType) {
   const pt = presetType || 'expense';
-  const t = existing || { type: pt, amount: '', date: todayStr(), categoryId: S.last[pt] || '', method: S.last.method || '', note: '' };
+  const t = existing || { type: pt, amount: '', date: todayStr(), categoryId: S.last[pt] || '', accountId: S.last.acc || '', note: '' };
   const usualDate = t.date || todayStr();
   openModal({
     title: existing ? 'İşlemi düzenle' : (t.type === 'income' ? 'Yeni gelir' : 'Yeni gider'),
@@ -781,18 +828,19 @@ function txForm(existing, presetType) {
         <label class="field"><span>Tarih</span><input class="input" type="date" name="date" value="${usualDate}" required></label>
       </div>
       <div class="fields-2">
-        <label class="field"><span>Ödeme yöntemi</span>${methodSelect(t.method)}</label>
+        <label class="field"><span>Hesap</span>${accountSelect(t.accountId)}</label>
         <label class="field"><span>Açıklama</span><input class="input" name="note" placeholder="Örn. Migros alışverişi" value="${esc(t.note)}"></label>
       </div>
+      ${existing ? '' : txExtrasHtml()}
       ${existing ? '' : '<label class="check"><input type="checkbox" name="again"> Kaydettikten sonra yeni kayıt aç</label>'}`,
-    onOpen: bindTypeSwitch,
+    onOpen: f => { bindTypeSwitch(f); if (!existing) bindTxExtras(f); },
     onSubmit: f => {
       const amount = parseAmount(val(f, 'amount'));
       if (!(amount > 0)) return fieldError(f, 'amount', 'Geçerli bir tutar gir');
-      const rec = { type: val(f, 'type'), amount, date: val(f, 'date'), categoryId: val(f, 'categoryId'), method: val(f, 'method'), note: val(f, 'note').trim() };
+      const rec = { type: val(f, 'type'), amount, date: val(f, 'date'), categoryId: val(f, 'categoryId'), accountId: val(f, 'accountId'), note: val(f, 'note').trim() };
       if (existing) Object.assign(existing, rec);
-      else S.data.transactions.push({ id: uid(), created: Date.now(), ...rec });
-      S.last[rec.type] = rec.categoryId; S.last.method = rec.method;
+      else if (saveTxWithExtras(f, rec) === false) return false;
+      S.last[rec.type] = rec.categoryId; S.last.acc = rec.accountId;
       const again = !existing && f.elements.again?.checked;
       commit();
       toast(existing ? 'İşlem güncellendi' : (rec.type === 'income' ? 'Gelir eklendi' : 'Gider eklendi'));
@@ -803,7 +851,7 @@ function txForm(existing, presetType) {
 
 /* Düzenli ödeme formu */
 function recForm(existing) {
-  const r = existing || { type: 'expense', name: '', amount: '', categoryId: '', frequency: 'monthly', nextDate: todayStr(), remaining: null, method: '', note: '' };
+  const r = existing || { type: 'expense', name: '', amount: '', categoryId: '', frequency: 'monthly', nextDate: todayStr(), remaining: null, accountId: '', note: '' };
   openModal({
     title: existing ? 'Düzenli ödemeyi düzenle' : 'Yeni düzenli ödeme',
     body: `${typeSeg(r.type)}
@@ -818,7 +866,7 @@ function recForm(existing) {
       </div>
       <div class="fields-2">
         <label class="field"><span>Kalan taksit sayısı (isteğe bağlı)</span><input class="input" name="remaining" type="number" min="1" step="1" placeholder="Sınırsız" value="${r.remaining ?? ''}"></label>
-        <label class="field"><span>Ödeme yöntemi</span>${methodSelect(r.method)}</label>
+        <label class="field"><span>Hesap</span>${accountSelect(r.accountId)}</label>
       </div>`,
     onOpen: bindTypeSwitch,
     onSubmit: f => {
@@ -829,7 +877,7 @@ function recForm(existing) {
       const rec = {
         type: val(f, 'type'), name: val(f, 'name').trim(), amount, categoryId: val(f, 'categoryId'),
         frequency: val(f, 'frequency'), nextDate: nd, anchorDay: parseDate(nd).getDate(),
-        remaining: remRaw ? Math.max(1, parseInt(remRaw, 10)) : null, method: val(f, 'method')
+        remaining: remRaw ? Math.max(1, parseInt(remRaw, 10)) : null, accountId: val(f, 'accountId')
       };
       if (existing) Object.assign(existing, rec);
       else S.data.recurring.push({ id: uid(), active: true, ...rec });
@@ -863,13 +911,13 @@ function payRec(r) {
         <label class="field"><span>Tutar</span><input class="input amount-input" name="amount" inputmode="decimal" value="${amountToInput(r.amount)}" required autofocus></label>
         <label class="field"><span>İşlem tarihi</span><input class="input" type="date" name="date" value="${daysUntil(r.nextDate) > 0 ? todayStr() : r.nextDate}" required></label>
       </div>
-      <label class="field"><span>Ödeme yöntemi</span>${methodSelect(r.method)}</label>`,
+      <label class="field"><span>Hesap</span>${accountSelect(r.accountId)}</label>`,
     submit: inc ? 'Alındı olarak işaretle' : 'Ödendi olarak işaretle',
     onSubmit: f => {
       const amount = parseAmount(val(f, 'amount'));
       if (!(amount > 0)) return fieldError(f, 'amount', 'Geçerli bir tutar gir');
       const txId = uid();
-      S.data.transactions.push({ id: txId, created: Date.now(), type: r.type || 'expense', amount, date: val(f, 'date'), categoryId: r.categoryId, method: val(f, 'method'), note: r.name, recurringId: r.id,
+      S.data.transactions.push({ id: txId, created: Date.now(), type: r.type || 'expense', amount, date: val(f, 'date'), categoryId: r.categoryId, accountId: val(f, 'accountId'), note: r.name, recurringId: r.id,
         recPrev: { nextDate: r.nextDate, remaining: r.remaining } });
       advanceRec(r);
       r.lastPayTx = txId;
@@ -915,14 +963,18 @@ function contribForm(g, sign) {
         <label class="field"><span>Tutar</span><input class="input amount-input" name="amount" inputmode="decimal" placeholder="0,00" required autofocus></label>
         <label class="field"><span>Tarih</span><input class="input" type="date" name="date" value="${todayStr()}" required></label>
       </div>
-      <label class="field"><span>Not</span><input class="input" name="note" placeholder="${sign > 0 ? 'Örn. Ekim birikimi' : 'Örn. Tatil için kullanıldı'}"></label>
-      <p class="muted" style="margin:0;font-size:12.5px">${sign > 0 ? 'Eklenen tutar bakiyeden düşülür, aylık özetteki "Birikime aktarılan" kısmında görünür.' : `Çekilebilir tutar: ${money(s)}. Çekilen tutar bakiyeye geri döner.`}</p>`,
+      <div class="fields-2">
+        <label class="field"><span>Not</span><input class="input" name="note" placeholder="${sign > 0 ? 'Örn. Ekim birikimi' : 'Örn. Tatil için kullanıldı'}"></label>
+        <label class="field"><span>${sign > 0 ? 'Hangi hesaptan' : 'Hangi hesaba'}</span>${accountSelect(S.last.goalAcc)}</label>
+      </div>
+      <p class="muted" style="margin:0;font-size:12.5px">${sign > 0 ? 'Eklenen tutar seçtiğin hesaptan düşülür, aylık özetteki "Birikime aktarılan" kısmında görünür.' : `Çekilebilir tutar: ${money(s)}. Çekilen tutar bakiyeye geri döner.`}</p>`,
     submit: sign > 0 ? 'Ekle' : 'Çek',
     onSubmit: f => {
       const amount = parseAmount(val(f, 'amount'));
       if (!(amount > 0)) return fieldError(f, 'amount', 'Geçerli bir tutar gir');
       if (sign < 0 && amount > s) return fieldError(f, 'amount', `En fazla ${money(s)} çekebilirsin`);
-      g.contributions.push({ id: uid(), date: val(f, 'date'), amount: sign * amount, note: val(f, 'note').trim() });
+      g.contributions.push({ id: uid(), date: val(f, 'date'), amount: sign * amount, note: val(f, 'note').trim(), accountId: val(f, 'accountId') });
+      S.last.goalAcc = val(f, 'accountId');
       commit();
       const done = sign > 0 && goalSaved(g) >= g.target;
       toast(done ? `Tebrikler, "${g.name}" hedefine ulaştın! 🎉` : 'Kaydedildi');
@@ -944,8 +996,8 @@ function goalHistory(g) {
 function toCsv(list) {
   const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const txt = s => /^[=+\-@\t\r]/.test(String(s ?? '')) ? "'" + s : (s ?? ''); // Excel'in metni formül sanmaması için
-  const rows = [['Tarih', 'Tür', 'Kategori', 'Açıklama', 'Ödeme yöntemi', 'Tutar']];
-  list.forEach(t => rows.push([t.date, t.type === 'income' ? 'Gelir' : 'Gider', txt(catById(t.categoryId).name), txt(t.note), txt(t.method), (t.type === 'income' ? t.amount : -t.amount).toFixed(2).replace('.', ',')]));
+  const rows = [['Tarih', 'Tür', 'Kategori', 'Açıklama', 'Hesap', 'Tutar']];
+  list.forEach(t => rows.push([t.date, t.type === 'income' ? 'Gelir' : 'Gider', txt(catById(t.categoryId).name), txt(t.note), txt(accName(t.accountId)), (t.type === 'income' ? t.amount : -t.amount).toFixed(2).replace('.', ',')]));
   return rows.map(r => r.map(q).join(';')).join('\r\n');
 }
 
@@ -954,7 +1006,7 @@ function loadSample() {
   const d = S.data, now = new Date();
   const ex = n => d.categories.expense.find(c => c.name === n)?.id || d.categories.expense[0].id;
   const inc = n => d.categories.income.find(c => c.name === n)?.id || d.categories.income[0].id;
-  const add = (type, amount, date, cat, method, note) => d.transactions.push({ id: uid(), created: Date.now(), type, amount, date, categoryId: cat, method, note, sample: true });
+  const add = (type, amount, date, cat, method, note) => d.transactions.push({ id: uid(), created: Date.now(), type, amount, date, categoryId: cat, accountId: METHOD_TO_ACCOUNT[method] || 'a-bank', note, sample: true });
   for (let m = 5; m >= 0; m--) {
     const base = new Date(now.getFullYear(), now.getMonth() - m, 1);
     const day = n => { const x = new Date(base); x.setDate(Math.min(n, lastDay(x.getFullYear(), x.getMonth()))); return ymd(x); };
@@ -977,7 +1029,7 @@ function loadSample() {
     if (20 <= lim) add('expense', 3200, day(20), ex('Kredi / Taksit'), 'Havale / EFT', 'Telefon taksiti');
   }
   const nextOn = n => { const x = new Date(now.getFullYear(), now.getMonth(), n); if (x < new Date(now.getFullYear(), now.getMonth(), now.getDate())) x.setMonth(x.getMonth() + 1); return ymd(x); };
-  const rec = (name, type, amount, cat, day, method, remaining = null) => d.recurring.push({ id: uid(), active: true, sample: true, type, name, amount, categoryId: cat, frequency: 'monthly', nextDate: nextOn(day), anchorDay: day, remaining, method });
+  const rec = (name, type, amount, cat, day, method, remaining = null) => d.recurring.push({ id: uid(), active: true, sample: true, type, name, amount, categoryId: cat, frequency: 'monthly', nextDate: nextOn(day), anchorDay: day, remaining, accountId: METHOD_TO_ACCOUNT[method] || 'a-bank' });
   rec('Ev kirası', 'expense', 17000, ex('Kira'), 2, 'Havale / EFT');
   rec('İnternet', 'expense', 450, ex('Faturalar'), 15, 'Kredi Kartı');
   rec('Netflix', 'expense', 350, ex('Abonelikler'), 14, 'Kredi Kartı');
@@ -985,16 +1037,17 @@ function loadSample() {
   rec('Telefon taksiti', 'expense', 3200, ex('Kredi / Taksit'), 20, 'Havale / EFT', 7);
   rec('Maaş', 'income', 42000, inc('Maaş'), 1, 'Havale / EFT');
   const due = new Date(now); due.setDate(due.getDate() + 2);
-  d.recurring.push({ id: uid(), active: true, sample: true, type: 'expense', name: 'Araç sigortası', amount: 8600, categoryId: ex('Diğer Gider'), frequency: 'yearly', nextDate: ymd(due), anchorDay: due.getDate(), remaining: null, method: 'Kredi Kartı' });
+  d.recurring.push({ id: uid(), active: true, sample: true, type: 'expense', name: 'Araç sigortası', amount: 8600, categoryId: ex('Diğer Gider'), frequency: 'yearly', nextDate: ymd(due), anchorDay: due.getDate(), remaining: null, accountId: 'a-card' });
   const goal = (name, target, monthsAhead, color, monthly) => {
     const dl = new Date(now.getFullYear(), now.getMonth() + monthsAhead, 1);
     const contributions = [];
-    for (let m = 5; m >= 0; m--) contributions.push({ id: uid(), date: ymd(new Date(now.getFullYear(), now.getMonth() - m, Math.min(25, m === 0 ? now.getDate() : 25))), amount: monthly, note: 'Aylık birikim' });
+    for (let m = 5; m >= 0; m--) contributions.push({ id: uid(), date: ymd(new Date(now.getFullYear(), now.getMonth() - m, Math.min(25, m === 0 ? now.getDate() : 25))), amount: monthly, note: 'Aylık birikim', accountId: 'a-bank' });
     d.goals.push({ id: uid(), created: Date.now(), sample: true, name, target, deadline: ymd(dl), color, contributions });
   };
   goal('Acil durum fonu', 120000, 10, '#5aa9e6', 6000);
   goal('Yaz tatili', 45000, 8, '#f0b429', 2500);
   goal('Yeni bilgisayar', 60000, 5, '#a78bfa', 3000);
+  sampleExtras(d, now, ex);
   d.budgets[ex('Market')] = 8000; d.budgets[ex('Yeme İçme')] = 2500; d.budgets[ex('Eğlence')] = 1500; d.budgets[ex('Giyim')] = 2000; d.budgets[ex('Faturalar')] = 2500;
   commit();
   toast('Örnek veriler yüklendi');
@@ -1175,10 +1228,10 @@ function exportable() {
 /* ---------- Olaylar ---------- */
 document.addEventListener('click', async e => {
   const goto = e.target.closest('[data-goto]');
-  if (goto) { S.view = goto.dataset.goto; render(); return; }
+  if (goto) { if ($('#modal').open) $('#modal').close(); S.view = goto.dataset.goto; render(); return; }
   if (S.locked) return;
   const nav = e.target.closest('[data-view]');
-  if (nav) { S.view = nav.dataset.view; $('#main').scrollTop = 0; window.scrollTo(0, 0); render(); return; }
+  if (nav) { if ($('#modal').open) $('#modal').close(); S.view = nav.dataset.view; $('#main').scrollTop = 0; window.scrollTo(0, 0); render(); return; }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action, id = el.dataset.id, d = S.data;
@@ -1198,6 +1251,7 @@ document.addEventListener('click', async e => {
     case 'edit-tx': return txForm(findTx());
     case 'del-tx': {
       const t = findTx();
+      if (t.inst) return deleteInstallments(t);
       // Düzenli ödemeden gelen son kayıt silinirse ödemenin tarihi de eski haline döner
       const rec = t.recurringId && t.recPrev ? d.recurring.find(r => r.id === t.recurringId && r.lastPayTx === t.id) : null;
       const extra = rec ? `<br><span class="muted">"${esc(rec.name)}" düzenli ödemesi de ödenmemiş sayılır, tarihi ${fmtDate(t.recPrev.nextDate)} olarak geri alınır.</span>` : '';
@@ -1216,7 +1270,7 @@ document.addEventListener('click', async e => {
     }
     case 'year-prev': S.year--; return render();
     case 'year-next': S.year++; return render();
-    case 'clear-filters': S.tx = { ...S.tx, type: 'all', cat: 'all', method: 'all', q: '' }; return render();
+    case 'clear-filters': S.tx = { ...S.tx, type: 'all', cat: 'all', acc: 'all', q: '' }; return render();
     case 'export-csv': case 'export-csv-all': {
       const list = a === 'export-csv' ? filteredTx() : [...d.transactions].sort((x, y) => x.date.localeCompare(y.date));
       if (!list.length) return toast('Dışa aktarılacak işlem yok');
@@ -1303,13 +1357,6 @@ document.addEventListener('click', async e => {
         }
       });
     }
-    case 'add-method':
-      return openModal({
-        title: 'Yeni ödeme yöntemi',
-        body: '<label class="field"><span>Ad</span><input class="input" name="name" placeholder="Örn. Yemek kartı" required autofocus></label>',
-        onSubmit: f => { const n = val(f, 'name').trim(); if (!d.methods.includes(n)) d.methods.push(n); commit(); }
-      });
-    case 'del-method': d.methods.splice(Number(el.dataset.i), 1); return commit();
 
     case 'backup': if (await api.exportJson(exportable())) toast('Yedek kaydedildi'); return;
     case 'restore': {
@@ -1334,6 +1381,8 @@ document.addEventListener('click', async e => {
       d.transactions = d.transactions.filter(t => !t.sample);
       d.recurring = d.recurring.filter(r => !r.sample);
       d.goals = d.goals.filter(g => !g.sample);
+      d.transfers = d.transfers.filter(t => !t.sample);
+      d.debts = d.debts.filter(x => !x.sample);
       commit(); return toast('Örnek veriler silindi');
     case 'wipe':
       return openModal({
@@ -1344,6 +1393,8 @@ document.addEventListener('click', async e => {
           S.data = defaultData(); S.view = 'ozet'; commit(); toast('Tüm veriler silindi');
         }
       });
+    default:
+      if (ACTIONS[a]) return ACTIONS[a](el, e);
   }
 });
 
@@ -1366,17 +1417,18 @@ document.addEventListener('keydown', e => {
 function startupReminder() {
   const s = S.data.settings, t = todayStr();
   if (s.lastNotified === t) return;
-  const due = dueList(s.reminderDays || 3).filter(r => r.type !== 'income');
+  const due = [...dueList(s.reminderDays || 3).filter(r => r.type !== 'income').map(r => ({ name: r.name, amount: r.amount, date: r.nextDate })), ...extraDueItems(s.reminderDays || 3)];
   if (!due.length) return;
-  const late = due.filter(r => daysUntil(r.nextDate) < 0).length;
+  const late = due.filter(r => daysUntil(r.date) < 0).length;
   const showAmt = !s.hideAmounts && !s.lock;
-  const body = due.slice(0, 4).map(r => `${r.name}${showAmt ? ': ' + money(r.amount) : ''} (${daysUntil(r.nextDate) < 0 ? 'gecikti' : daysUntil(r.nextDate) === 0 ? 'bugün' : fmtDate(r.nextDate)})`).join('\n');
+  const body = due.slice(0, 4).map(r => `${r.name}${showAmt ? ': ' + money(r.amount) : ''} (${daysUntil(r.date) < 0 ? 'gecikti' : daysUntil(r.date) === 0 ? 'bugün' : fmtDate(r.date)})`).join('\n');
   api.notify(late ? `${late} gecikmiş ödemen var` : `${due.length} ödeme yaklaşıyor`, body).catch(() => {});
   s.lastNotified = t;
   persist();
 }
 
-(async function init() {
+const ACTIONS = {};
+async function boot() {
   let loaded = null;
   try { loaded = await api.load(); } catch { /* ilk açılış */ }
   S.data = normalize(loaded);
@@ -1398,4 +1450,4 @@ function startupReminder() {
   // Uygulama gün boyu açık kalırsa gün değişiminde ekranı ve hatırlatmayı yenile
   let curDay = todayStr();
   setInterval(() => { if (todayStr() !== curDay) { curDay = todayStr(); render(); startupReminder(); } }, 60000);
-})();
+}

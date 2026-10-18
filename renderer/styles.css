@@ -427,3 +427,27 @@ body.locked .app { visibility: hidden; }
   .bud-table .c-bar { grid-area: bar; }
   .bud-table .c-bar:empty { display: none; }
 }
+
+/* Hesaplar, net varlık, bölüşme, Diğer menüsü */
+.acc-ico { font-size: 20px; width: 28px; text-align: center; flex: none; }
+.acc-card .goal-amt small { font-size: 13px; }
+.networth { display: grid; gap: 8px; }
+.networth div { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.networth div span { color: var(--muted); }
+.networth .total { border-bottom: 0; border-top: 1px solid var(--line); padding-top: 10px; font-size: 17px; }
+.networth .total span { color: var(--text); font-weight: 700; }
+.extras { display: grid; gap: 10px; }
+.extras [hidden] { display: none !important; }
+#splitBox { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.split-row { display: grid; grid-template-columns: 1fr 120px auto; gap: 8px; }
+.pick-amt { cursor: pointer; padding: 6px 12px; }
+.pick-amt:hover { border-color: var(--accent); }
+.tr-row td.c-amt { color: var(--muted); }
+.more-list { display: grid; gap: 8px; }
+.more-item { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); text-align: left; cursor: pointer; }
+.more-item > span { font-size: 22px; width: 28px; text-align: center; }
+.more-item b { display: block; font-size: 15px; }
+.more-item small { color: var(--muted); }
+.more-item.active { border-color: var(--accent); }
+.hide-amounts .networth b { filter: blur(7px); }
+@media (max-width: 760px) { .split-row { grid-template-columns: 1fr 100px auto; } }
