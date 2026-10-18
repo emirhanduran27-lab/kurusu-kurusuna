@@ -236,10 +236,27 @@ dialog::backdrop { background: rgba(5,10,15,.55); backdrop-filter: blur(2px); }
 
 /* Güncelleme */
 .upd-banner {
-  margin-top: auto; border: 1px solid color-mix(in srgb, var(--saving) 50%, transparent);
-  background: color-mix(in srgb, var(--saving) 14%, transparent); color: var(--text);
-  border-radius: 10px; padding: 10px 12px; text-align: left; cursor: pointer; font-size: 12.5px; line-height: 1.35;
+  margin-top: auto; display: flex; gap: 10px; align-items: flex-start; width: 100%;
+  border: 1px solid color-mix(in srgb, var(--saving) 55%, transparent);
+  background: color-mix(in srgb, var(--saving) 14%, var(--panel)); color: var(--text);
+  border-radius: 12px; padding: 11px 12px; text-align: left; cursor: pointer; font-size: 12.5px; line-height: 1.35;
+  animation: upd-in .35s ease-out;
 }
-.upd-banner b { color: var(--saving); display: block; font-size: 13px; }
+.upd-banner[hidden] { display: none; }
+.upd-banner:hover { filter: brightness(1.08); }
+.upd-banner b { color: var(--saving); display: block; font-size: 13px; margin-bottom: 1px; }
+.upd-banner .upd-txt { flex: 1; min-width: 0; color: var(--muted); }
+.upd-ico {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--saving); color: #fff; font-weight: 700; font-size: 13px;
+}
+.upd-banner.ready { border-color: color-mix(in srgb, var(--income) 60%, transparent); background: color-mix(in srgb, var(--income) 14%, var(--panel)); animation: upd-in .35s ease-out, upd-pulse 2.4s ease-in-out .4s 3; }
+.upd-banner.ready b { color: var(--income); }
+.upd-banner.ready .upd-ico { background: var(--income); }
+.upd-banner.manual .upd-ico { background: var(--warn); }
+.upd-bar { height: 5px; border-radius: 4px; background: var(--panel-2); margin-top: 6px; overflow: hidden; }
+.upd-bar > i { display: block; height: 100%; background: var(--saving); transition: width .3s; }
 .upd-banner:not([hidden]) + .quick { margin-top: 0; }
 .upd-status { font-size: 12.5px; }
+@keyframes upd-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes upd-pulse { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--income) 30%, transparent); } }

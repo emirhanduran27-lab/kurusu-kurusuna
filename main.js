@@ -3,6 +3,8 @@ const { app, BrowserWindow, ipcMain, dialog, Notification, shell, Menu } = requi
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const { execFile, spawn } = require('child_process');
 
 // Ad Türkçe karakter içerdiği için veri klasörünü elle belirle
 app.setPath('userData', path.join(app.getPath('appData'), 'Kuruşu Kuruşuna'));
@@ -107,38 +109,126 @@ function sendUpdate(state) {
   updateState = state;
   if (win && !win.isDestroyed()) win.webContents.send('update:state', state);
 }
-// Mac'te kendiliğinden kurulum yalnızca Apple imzalı programlarda çalışır.
-// Bu yüzden Mac'te yeni sürüm bulununca indirme sayfası gösterilir.
 const IS_MAC = process.platform === 'darwin';
-const RELEASES_URL = 'https://github.com/emirhanduran27-lab/kurusu-kurusuna/releases/latest';
+const REPO = 'emirhanduran27-lab/kurusu-kurusuna';
+const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+
+function notifyReady(version) {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title: 'Kuruşu Kuruşuna güncellemesi hazır', body: `${version} sürümü indirildi. Program kapanınca kurulacak, istersen şimdi de kurabilirsin.`, icon: path.join(__dirname, 'build', 'icon.png') });
+  n.on('click', () => { if (win) { win.show(); win.focus(); } });
+  n.show();
+}
+
 function setupUpdater() {
+  // Windows: electron-updater indirir ve sessizce kurar.
+  // Mac: Apple imzası olmadan electron-updater kuramadığı için indirme ve kurulumu macUpdate yapar.
   autoUpdater.autoDownload = !IS_MAC;
   autoUpdater.autoInstallOnAppQuit = !IS_MAC;
-  autoUpdater.on('checking-for-update', () => sendUpdate({ status: 'checking' }));
+  autoUpdater.on('checking-for-update', () => { if (!busyUpdating()) sendUpdate({ status: 'checking' }); });
   autoUpdater.on('update-available', i => {
     if (!IS_MAC) return sendUpdate({ status: 'downloading', version: i.version, percent: 0 });
-    const first = updateState.status !== 'manual';
-    sendUpdate({ status: 'manual', version: i.version });
-    if (first && Notification.isSupported()) {
-      const n = new Notification({ title: 'Kuruşu Kuruşuna', body: `${i.version} sürümü çıktı. İndirmek için tıkla.` });
-      n.on('click', () => shell.openExternal(RELEASES_URL));
-      n.show();
-    }
+    macUpdate.download(i).catch(err => {
+      sendUpdate({ status: 'manual', version: i.version, message: String(err?.message || err) });
+    });
   });
-  autoUpdater.on('update-not-available', () => sendUpdate({ status: 'latest' }));
+  autoUpdater.on('update-not-available', () => { if (!busyUpdating()) sendUpdate({ status: 'latest' }); });
   autoUpdater.on('download-progress', p => sendUpdate({ status: 'downloading', version: updateState.version, percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded', i => {
-    sendUpdate({ status: 'ready', version: i.version });
-    if (Notification.isSupported()) {
-      new Notification({ title: 'Kuruşu Kuruşuna güncellendi', body: `${i.version} sürümü hazır. Program kapanınca kurulacak.`, icon: path.join(__dirname, 'build', 'icon.png') }).show();
-    }
-  });
-  autoUpdater.on('error', e => sendUpdate({ status: 'error', message: String(e?.message || e).split('\n')[0] }));
+  autoUpdater.on('update-downloaded', i => { sendUpdate({ status: 'ready', version: i.version }); notifyReady(i.version); });
+  autoUpdater.on('error', e => { if (!busyUpdating()) sendUpdate({ status: 'error', message: String(e?.message || e).split('\n')[0] }); });
 }
+function busyUpdating() { return updateState.status === 'downloading' || updateState.status === 'ready'; }
 function checkForUpdates() {
   if (!app.isPackaged) { sendUpdate({ status: 'dev' }); return; }
+  if (busyUpdating()) { sendUpdate(updateState); return; }
   autoUpdater.checkForUpdates().catch(e => sendUpdate({ status: 'error', message: String(e?.message || e).split('\n')[0] }));
 }
+function installUpdate() {
+  if (IS_MAC) {
+    if (macUpdate.ready) return macUpdate.installAndRestart();
+    return shell.openExternal(RELEASES_URL);
+  }
+  // Sessiz kurulum: sihirbaz açılmaz, kurulum bitince program yeniden açılır
+  autoUpdater.quitAndInstall(true, true);
+}
+
+/* Mac için kendi güncelleyicimiz: zip'i indirir, doğrular, açar,
+   program kapanırken eski .app'i yenisiyle değiştirip yeniden başlatır. */
+const macUpdate = {
+  ready: null, // { version, newApp }
+  downloading: false,
+  appPath() { return path.resolve(process.execPath, '..', '..', '..'); },
+  canSelfUpdate() {
+    const p = this.appPath();
+    if (!p.endsWith('.app') || p.startsWith('/Volumes/') || p.includes('AppTranslocation')) return false;
+    try { fs.accessSync(path.dirname(p), fs.constants.W_OK); return true; } catch { return false; }
+  },
+  async download(info) {
+    if (this.downloading || (this.ready && this.ready.version === info.version)) return;
+    if (!this.canSelfUpdate()) throw new Error('Program Uygulamalar klasöründe değil ya da yazılamıyor');
+    const file = (info.files || []).find(f => f.url.endsWith('.zip'));
+    if (!file) throw new Error('Mac zip dosyası bulunamadı');
+    this.downloading = true;
+    try {
+      const url = `https://github.com/${REPO}/releases/download/v${info.version}/${file.url}`;
+      const dir = path.join(app.getPath('temp'), 'kurusu-kurusuna-guncelleme');
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.mkdirSync(dir, { recursive: true });
+      const zip = path.join(dir, 'update.zip');
+      sendUpdate({ status: 'downloading', version: info.version, percent: 0 });
+      const res = await fetch(url);
+      if (!res.ok || !res.body) throw new Error('İndirme başarısız: ' + res.status);
+      const total = Number(res.headers.get('content-length')) || file.size || 0;
+      const hash = crypto.createHash('sha512');
+      const out = fs.createWriteStream(zip);
+      let got = 0, lastPct = -1;
+      for await (const chunk of res.body) {
+        hash.update(chunk); got += chunk.length;
+        if (!out.write(chunk)) await new Promise(r => out.once('drain', r));
+        const pct = total ? Math.floor(got / total * 100) : 0;
+        if (pct !== lastPct) { lastPct = pct; sendUpdate({ status: 'downloading', version: info.version, percent: pct }); }
+      }
+      await new Promise((r, j) => out.end(e => e ? j(e) : r()));
+      if (file.sha512 && hash.digest('base64') !== file.sha512) throw new Error('İndirilen dosya doğrulanamadı');
+      const unpack = path.join(dir, 'app');
+      fs.mkdirSync(unpack);
+      await new Promise((r, j) => execFile('/usr/bin/ditto', ['-x', '-k', zip, unpack], e => e ? j(e) : r()));
+      const name = fs.readdirSync(unpack).find(n => n.endsWith('.app'));
+      if (!name) throw new Error('Zip içinde program bulunamadı');
+      this.ready = { version: info.version, newApp: path.join(unpack, name) };
+      sendUpdate({ status: 'ready', version: info.version });
+      notifyReady(info.version);
+    } finally {
+      this.downloading = false;
+    }
+  },
+  // Program kapandıktan sonra çalışan küçük betik eski programı yenisiyle değiştirir
+  spawnSwap(relaunch) {
+    const target = this.appPath();
+    const backup = target + '.eski';
+    const q = s => "'" + s.replace(/'/g, "'\\''") + "'";
+    const script = [
+      '#!/bin/bash',
+      `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done`,
+      `rm -rf ${q(backup)}`,
+      `if mv ${q(target)} ${q(backup)} && /usr/bin/ditto ${q(this.ready.newApp)} ${q(target)}; then`,
+      `  rm -rf ${q(backup)}`,
+      'else',
+      `  rm -rf ${q(target)}; mv ${q(backup)} ${q(target)}`,
+      'fi',
+      `/usr/bin/xattr -cr ${q(target)} 2>/dev/null`,
+      relaunch ? `/usr/bin/open ${q(target)}` : ':',
+      ''
+    ].join('\n');
+    const sh = path.join(app.getPath('temp'), 'kurusu-kurusuna-guncelle.sh');
+    fs.writeFileSync(sh, script, { mode: 0o755 });
+    spawn('/bin/bash', [sh], { detached: true, stdio: 'ignore' }).unref();
+    this.ready = null;
+  },
+  installAndRestart() { this.spawnSwap(true); app.quit(); }
+};
+// Mac'te güncelleme indirildiyse program kapanırken sessizce kur
+app.on('will-quit', () => { if (IS_MAC && macUpdate.ready) macUpdate.spawnSwap(false); });
 
 function createWindow() {
   win = new BrowserWindow({
@@ -225,10 +315,7 @@ if (!gotLock) {
     ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataPath: dataFile() }));
     ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
     ipcMain.handle('update:state', () => updateState);
-    ipcMain.handle('update:install', () => {
-      if (IS_MAC) return shell.openExternal(RELEASES_URL);
-      autoUpdater.quitAndInstall(false, true);
-    });
+    ipcMain.handle('update:install', () => installUpdate());
     ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url); });
 
     createWindow();

@@ -6,7 +6,7 @@ Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows ve Mac ma
 
 [Releases](https://github.com/emirhanduran27-lab/kurusu-kurusuna/releases/latest) sayfasından indir.
 
-**Windows:** `KurusuKurusuna-Kurulum-x.y.z.exe` dosyasını çalıştır. "Bilinmeyen yayıncı" uyarısı çıkarsa "Ek bilgi" ve "Yine de çalıştır" de. Sonraki sürümler kendiliğinden iner ve kurulur.
+**Windows:** `KurusuKurusuna-Kurulum-x.y.z.exe` dosyasını çalıştır. "Bilinmeyen yayıncı" uyarısı çıkarsa "Ek bilgi" ve "Yine de çalıştır" de.
 
 **Mac:** `KurusuKurusuna-x.y.z-mac.dmg` dosyasını aç, simgeyi Uygulamalar klasörüne sürükle. Hem Intel hem Apple Silicon (M1, M2, M3, M4) Mac'lerde çalışır. Program Apple tarafından imzalı olmadığı için ilk açılışta macOS engeller:
 1. Programı bir kez açmayı dene, uyarıyı kapat.
@@ -16,7 +16,11 @@ Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows ve Mac ma
 ```
 xattr -cr "/Applications/Kuruşu Kuruşuna.app"
 ```
-Mac'te yeni sürüm çıktığında program haber verir ve indirme sayfasını açar. Yeni `.dmg` dosyasını eskisinin üzerine kurman yeterli, veriler korunur.
+Program Uygulamalar klasöründen çalışmalı. Doğrudan `.dmg` içinden açılırsa kendini güncelleyemez.
+
+## Güncellemeler
+
+Program açılışta ve açık kaldığı sürece 6 saatte bir yeni sürüme bakar. Yeni sürüm varsa arka planda iner, sol altta "Güncelleme geldi" kutusu çıkar. İnince kutu yeşile döner. Program kapanınca güncelleme sessizce kurulur, istenirse kutuya tıklayıp hemen kurulabilir. Kurulum sihirbazı açılmaz, veriler korunur. Windows ve Mac'te aynı şekilde çalışır.
 
 ## Bölümler
 
