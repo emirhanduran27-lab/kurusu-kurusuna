@@ -30,16 +30,11 @@ npm start
 
 ## Yeni sürüm yayınlama
 
-1. `package.json` içindeki `version` değerini artır (örneğin `1.2.0`).
-2. Değişiklikleri gönder, sonra aynı numarayla etiket gönder:
-   ```
-   git commit -am "Sürüm 1.2.0"
-   git tag v1.2.0
-   git push && git push --tags
-   ```
-3. GitHub Actions kurulum dosyasını derleyip Releases'e yükler. Kullanıcılardaki program birkaç saat içinde güncellemeyi bulur.
+1. `package.json` içindeki `version` değerini artır (örneğin `1.2.0`) ve değişiklikleri `main` dalına gönder.
+2. GitHub'da **Actions → Sürüm yayınla → Run workflow** düğmesine bas. Ya da aynı numarayla `v1.2.0` etiketi gönder.
+3. İş akışı kurulum dosyasını derleyip `v1.2.0` sürümü olarak Releases'e yükler. Kullanıcılardaki program birkaç saat içinde güncellemeyi bulur.
 
-Etiketteki numara ile `package.json` içindeki sürüm aynı olmalı.
+Sürüm numarası artırılmadan çalıştırılırsa yeni bir sürüm çıkmaz, var olan sürümün dosyaları yenilenir.
 
 ## Kod imzalama
 
