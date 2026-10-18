@@ -2,7 +2,10 @@
    Uygulama sadece bu dar arayüzü kullanır; testlerde aynı arayüze sahip sahte bir sunucu konur. */
 import { createClient } from '@supabase/supabase-js';
 
-const REDIRECT = 'kurusukurusuna://auth';
+// Telefonda tarayıcı uygulamaya dönünce kendiliğinden kapanır. Masaüstünde tarayıcı sekmeyi kapatamadığı için
+// önce "Giriş tamamlandı" sayfasına gidilir, o sayfa da kodu kurusukurusuna://auth bağlantısıyla uygulamaya iletir.
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const REDIRECT = NATIVE ? 'kurusukurusuna://auth' : 'https://emirhanduran27-lab.github.io/kurusu-kurusuna/giris.html';
 
 window.KKCloud = {
   create(url, key) {

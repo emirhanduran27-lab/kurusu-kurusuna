@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Kuruşu Kuruşuna · Giriş</title><link rel="icon" href="icon.png"><link rel="stylesheet" href="stil.css">
+<style>main{text-align:center;padding-top:12vh}header{justify-content:center}.card{text-align:left}</style></head>
+<body><main>
+<header><img src="icon.png" alt=""><h1>Kuruşu Kuruşuna</h1></header>
+<div class="card" id="box"><h2 id="t" style="margin-top:0">Uygulamaya dönülüyor…</h2><p id="m" class="mute">Tarayıcı izin isterse "Aç" seçeneğine bas.</p>
+<div class="btns" id="b" hidden><a class="btn" id="open" href="#">Uygulamayı aç</a></div></div>
+</main>
+<script>
+(function () {
+  var q = location.search.slice(1), h = location.hash.slice(1);
+  var p = new URLSearchParams(q || h);
+  var t = document.getElementById('t'), m = document.getElementById('m');
+  if (p.get('error_description') || p.get('error')) {
+    t.textContent = 'Giriş tamamlanamadı';
+    m.textContent = (p.get('error_description') || p.get('error')).replace(/\+/g, ' ') + '. Uygulamaya dönüp tekrar deneyebilirsin.';
+    return;
+  }
+  if (!p.get('code')) { t.textContent = 'Bu sayfa giriş için kullanılır'; m.textContent = 'Uygulamadan giriş yaptığında buraya otomatik yönlendirilirsin.'; return; }
+  var link = 'kurusukurusuna://auth?' + (q || h);
+  document.getElementById('open').href = link;
+  history.replaceState(null, '', location.pathname);
+  location.href = link;
+  setTimeout(function () {
+    t.textContent = 'Giriş tamamlandı';
+    m.textContent = 'Kuruşu Kuruşuna\'ya geri dönebilirsin, bu sekmeyi kapatabilirsin. Uygulama açılmadıysa aşağıdaki düğmeye bas.';
+    document.getElementById('b').hidden = false;
+    try { window.close(); } catch (e) {}
+  }, 1200);
+})();
+</script>
+</body></html>
