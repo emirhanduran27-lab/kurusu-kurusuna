@@ -1,0 +1,35 @@
+name: Sürüm yayınla
+
+# "v1.2.0" gibi bir etiket gönderildiğinde Windows kurulum dosyasını derler
+# ve GitHub Releases'e yükler. Program güncellemeleri buradan alır.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Derle ve yayınla
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Kod imzalama sertifikası alındığında bu iki secret eklenir, imzalama kendiliğinden açılır
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$WIN_CSC_LINK" ]; then unset WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
+          npx electron-builder --win nsis --publish always

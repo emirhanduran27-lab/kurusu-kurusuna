@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="tr" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'">
+  <title>Kuruşu Kuruşuna</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../build/icon.png" alt="" class="brand-logo">
+        <div>
+          <div class="brand-name">Kuruşu Kuruşuna</div>
+          <div class="brand-sub" id="brandBalance">&nbsp;</div>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button data-view="ozet" class="active"><span class="ico">◧</span>Özet</button>
+        <button data-view="islemler"><span class="ico">⇅</span>İşlemler</button>
+        <button data-view="duzenli"><span class="ico">↻</span>Düzenli Ödemeler<span class="nav-badge" id="dueBadge" hidden></span></button>
+        <button data-view="birikim"><span class="ico">◎</span>Birikimler</button>
+        <button data-view="butce"><span class="ico">▤</span>Bütçe ve Raporlar</button>
+        <button data-view="ayarlar"><span class="ico">⚙</span>Ayarlar</button>
+      </nav>
+      <button class="upd-banner" id="updBanner" data-action="install-update" hidden></button>
+      <div class="quick">
+        <button class="btn btn-income" data-action="new-income">+ Gelir</button>
+        <button class="btn btn-expense" data-action="new-expense">+ Gider</button>
+      </div>
+      <div class="hint">Kısayol: <kbd>G</kbd> gelir, <kbd>N</kbd> gider</div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>
+
+  <dialog id="modal">
+    <form method="dialog" id="modalForm">
+      <header class="modal-head">
+        <h3 id="modalTitle"></h3>
+        <button type="button" class="icon-btn" data-close aria-label="Kapat">✕</button>
+      </header>
+      <div class="modal-body" id="modalBody"></div>
+      <footer class="modal-foot" id="modalFoot"></footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
