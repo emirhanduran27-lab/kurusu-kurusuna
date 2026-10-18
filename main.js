@@ -244,7 +244,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      devTools: !app.isPackaged
     }
   });
   win.setMenuBarVisibility(false);
@@ -268,7 +269,8 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.emirhan.gelirgider');
-    if (IS_MAC) setMacMenu();
+    // Windows'ta gizli menü (Alt) ve geliştirici araçları kısayolları kapatılır
+    if (IS_MAC) setMacMenu(); else Menu.setApplicationMenu(null);
     migrateOldData();
     setupUpdater();
 

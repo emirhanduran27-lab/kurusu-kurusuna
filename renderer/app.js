@@ -92,8 +92,18 @@ function normalize(d) {
   d.categories.expense = d.categories.expense || def.categories.expense;
   d.methods = Array.isArray(d.methods) && d.methods.length ? d.methods : def.methods;
   for (const k of ['transactions', 'recurring', 'goals']) if (!Array.isArray(d[k])) d[k] = [];
-  d.budgets = d.budgets || {};
-  d.goals.forEach(g => { g.contributions = g.contributions || []; });
+  d.budgets = d.budgets && typeof d.budgets === 'object' ? d.budgets : {};
+  // Yedekten ya da eski sürümden gelen kayıtları güvenli hale getir
+  const safeId = v => String(v ?? '').replace(/[^\w-]/g, '') || uid();
+  const safeColor = v => /^#[0-9a-f]{6}$/i.test(String(v)) ? v : '#94a3b8';
+  const num = v => { const n = Number(v); return Number.isFinite(n) ? round2(n) : NaN; };
+  const okDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+  for (const t of ['income', 'expense']) d.categories[t].forEach(c => { c.id = safeId(c.id); c.color = safeColor(c.color); c.name = String(c.name || 'Kategori'); });
+  d.transactions = d.transactions.filter(t => okDate(t.date) && num(t.amount) > 0).map(t => ({ ...t, id: safeId(t.id), amount: num(t.amount), type: t.type === 'income' ? 'income' : 'expense', categoryId: safeId(t.categoryId) }));
+  d.recurring = d.recurring.filter(r => num(r.amount) > 0).map(r => ({ ...r, id: safeId(r.id), amount: num(r.amount), categoryId: safeId(r.categoryId), nextDate: okDate(r.nextDate) ? r.nextDate : null, frequency: FREQ[r.frequency] ? r.frequency : 'monthly' }));
+  d.goals = d.goals.filter(g => num(g.target) > 0).map(g => ({ ...g, id: safeId(g.id), target: num(g.target), color: safeColor(g.color),
+    contributions: (Array.isArray(g.contributions) ? g.contributions : []).filter(c => okDate(c.date) && Number.isFinite(num(c.amount))).map(c => ({ ...c, id: safeId(c.id), amount: num(c.amount) })) }));
+  for (const k of Object.keys(d.budgets)) { const v = num(d.budgets[k]); if (!(v > 0)) delete d.budgets[k]; else d.budgets[k] = v; }
   return d;
 }
 
@@ -123,7 +133,7 @@ function upcomingReminders() {
   const at = (dateStr, hour) => { const d = parseDate(dateStr); d.setHours(hour, 0, 0, 0); return d; };
   S.data.recurring.filter(r => r.active !== false && r.nextDate && r.type !== 'income' && daysUntil(r.nextDate) <= 60).forEach(r => {
     const before = parseDate(r.nextDate); before.setDate(before.getDate() - (s.reminderDays || 3));
-    const amount = s.hideAmounts ? '' : ` (${money(r.amount)})`;
+    const amount = s.hideAmounts || s.lock ? '' : ` (${money(r.amount)})`;
     out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${r.name}${amount} ${fmtDate(r.nextDate)} tarihinde.` });
     out.push({ at: at(r.nextDate, 10).getTime(), title: 'Bugün ödeme günü', body: `${r.name}${amount} bugün ödenecek.` });
   });
@@ -139,7 +149,8 @@ const catsOf = type => S.data.categories[type === 'income' ? 'income' : 'expense
 function txInMonth(mk) { return S.data.transactions.filter(t => monthOf(t.date) === mk); }
 function contribsInMonth(mk) {
   let s = 0;
-  S.data.goals.forEach(g => g.contributions.forEach(c => { if (monthOf(c.date) === mk) s += c.amount; }));
+  // "Başlangıç birikimi" uygulamadan önce biriktirilmiş paradır, bu ayın bakiyesinden çıkmaz
+  S.data.goals.forEach(g => g.contributions.forEach(c => { if (!c.initial && monthOf(c.date) === mk) s += c.amount; }));
   return round2(s);
 }
 function monthStats(mk) {
@@ -155,10 +166,11 @@ function expenseByCat(mk) {
 }
 function goalSaved(g) { return round2(g.contributions.reduce((s, c) => s + c.amount, 0)); }
 function totalSaved() { return round2(S.data.goals.reduce((s, g) => s + goalSaved(g), 0)); }
+function savedFromBalance() { return round2(S.data.goals.reduce((s, g) => s + g.contributions.reduce((a, c) => a + (c.initial ? 0 : c.amount), 0), 0)); }
 function balance() {
   let b = 0;
   S.data.transactions.forEach(t => { b += t.type === 'income' ? t.amount : -t.amount; });
-  return round2(b - totalSaved());
+  return round2(b - savedFromBalance());
 }
 function dueList(daysAhead = 30) {
   return S.data.recurring
@@ -243,7 +255,7 @@ function render() {
   document.documentElement.dataset.theme = S.data.settings.theme;
   chartDefaults();
   $$('#nav button, .tabbar button').forEach(b => b.classList.toggle('active', b.dataset.view === S.view));
-  const due = dueList(S.data.settings.reminderDays || 3).length;
+  const due = dueList(S.data.settings.reminderDays || 3).filter(r => r.type !== 'income').length;
   for (const id of ['#dueBadge', '#mDueBadge']) { const badge = $(id); badge.hidden = !due; badge.textContent = due; }
   $('#brandBalance').textContent = 'Bakiye: ' + money(balance());
   $('#mBalance').textContent = money(balance());
@@ -466,7 +478,7 @@ VIEWS.duzenli = () => {
   const monthlyOut = round2(active.filter(r => r.type !== 'income').reduce((s, r) => s + r.amount * FREQ_PER_MONTH[r.frequency], 0));
   const monthlyIn = round2(active.filter(r => r.type === 'income').reduce((s, r) => s + r.amount * FREQ_PER_MONTH[r.frequency], 0));
   const late = active.filter(r => daysUntil(r.nextDate) < 0);
-  const thisMonthLeft = active.filter(r => r.type !== 'income' && monthOf(r.nextDate) <= monthOf(todayStr())).reduce((s, r) => s + r.amount, 0);
+  const thisMonthLeft = round2(active.filter(r => r.type !== 'income').reduce((s, r) => s + r.amount * occurrencesUntilMonthEnd(r), 0));
 
   return `<div class="page-head"><h1>Düzenli Ödemeler</h1><div class="spacer"></div><button class="btn btn-primary" data-action="new-rec">+ Yeni düzenli ödeme</button></div>
   <div class="grid g4">
@@ -548,7 +560,13 @@ VIEWS.butce = () => {
   const totSpent = cats.reduce((s, c) => s + (S.data.budgets[c.id] ? (byCat[c.id] || 0) : 0), 0);
   const prevByCat = expenseByCat(shiftMonth(S.month, -1));
   const avg = {};
-  for (let i = 1; i <= 6; i++) { const m = expenseByCat(shiftMonth(S.month, -i)); for (const k in m) avg[k] = (avg[k] || 0) + m[k] / 6; }
+  let dataMonths = 0;
+  for (let i = 1; i <= 6; i++) {
+    const m = expenseByCat(shiftMonth(S.month, -i));
+    if (Object.keys(m).length) dataMonths++;
+    for (const k in m) avg[k] = (avg[k] || 0) + m[k];
+  }
+  for (const k in avg) avg[k] /= Math.max(1, dataMonths);
 
   const yearMonths = Array.from({ length: 12 }, (_, i) => `${S.year}-${pad(i + 1)}`);
   const ys = yearMonths.map(monthStats);
@@ -594,7 +612,12 @@ AFTER.butce = () => {
   $$('.budget-in').forEach(inp => inp.addEventListener('change', () => {
     const v = parseAmount(inp.value);
     if (isNaN(v) || v <= 0) delete S.data.budgets[inp.dataset.cat]; else S.data.budgets[inp.dataset.cat] = v;
-    commit();
+    persist();
+    setTimeout(() => {
+      const next = document.activeElement?.classList.contains('budget-in') ? document.activeElement.dataset.cat : null;
+      render();
+      if (next) { const el = $(`.budget-in[data-cat="${next}"]`); el?.focus(); el?.select(); }
+    }, 0);
   }));
   const yearMonths = Array.from({ length: 12 }, (_, i) => `${S.year}-${pad(i + 1)}`);
   const ys = yearMonths.map(monthStats);
@@ -815,6 +838,17 @@ function recForm(existing) {
     }
   });
 }
+// Bu ayın sonuna kadar (gecikenler dahil) kaç ödeme düşüyor
+function occurrencesUntilMonthEnd(r) {
+  const end = monthOf(todayStr());
+  let d = r.nextDate, n = 0, left = r.remaining;
+  while (d && monthOf(d) <= end && n < 60 && (left == null || left > 0)) {
+    n++; if (left != null) left--;
+    if (r.frequency === 'once') break;
+    d = nextDate(d, r.frequency, r.anchorDay);
+  }
+  return n;
+}
 function advanceRec(r) {
   if (r.remaining != null) r.remaining -= 1;
   if (r.frequency === 'once' || (r.remaining != null && r.remaining <= 0)) { r.nextDate = null; r.remaining = r.remaining != null ? 0 : null; return; }
@@ -834,8 +868,11 @@ function payRec(r) {
     onSubmit: f => {
       const amount = parseAmount(val(f, 'amount'));
       if (!(amount > 0)) return fieldError(f, 'amount', 'Geçerli bir tutar gir');
-      S.data.transactions.push({ id: uid(), created: Date.now(), type: r.type || 'expense', amount, date: val(f, 'date'), categoryId: r.categoryId, method: val(f, 'method'), note: r.name, recurringId: r.id });
+      const txId = uid();
+      S.data.transactions.push({ id: txId, created: Date.now(), type: r.type || 'expense', amount, date: val(f, 'date'), categoryId: r.categoryId, method: val(f, 'method'), note: r.name, recurringId: r.id,
+        recPrev: { nextDate: r.nextDate, remaining: r.remaining } });
       advanceRec(r);
+      r.lastPayTx = txId;
       commit();
       toast(r.nextDate ? `Kaydedildi. Sonraki: ${fmtDate(r.nextDate)}` : 'Kaydedildi. Ödeme tamamlandı');
     }
@@ -906,8 +943,9 @@ function goalHistory(g) {
 /* CSV */
 function toCsv(list) {
   const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+  const txt = s => /^[=+\-@\t\r]/.test(String(s ?? '')) ? "'" + s : (s ?? ''); // Excel'in metni formül sanmaması için
   const rows = [['Tarih', 'Tür', 'Kategori', 'Açıklama', 'Ödeme yöntemi', 'Tutar']];
-  list.forEach(t => rows.push([t.date, t.type === 'income' ? 'Gelir' : 'Gider', catById(t.categoryId).name, t.note || '', t.method || '', (t.type === 'income' ? t.amount : -t.amount).toFixed(2).replace('.', ',')]));
+  list.forEach(t => rows.push([t.date, t.type === 'income' ? 'Gelir' : 'Gider', txt(catById(t.categoryId).name), txt(t.note), txt(t.method), (t.type === 'income' ? t.amount : -t.amount).toFixed(2).replace('.', ',')]));
   return rows.map(r => r.map(q).join(';')).join('\r\n');
 }
 
@@ -1160,8 +1198,12 @@ document.addEventListener('click', async e => {
     case 'edit-tx': return txForm(findTx());
     case 'del-tx': {
       const t = findTx();
-      if (await confirmBox('İşlemi sil', `${fmtDate(t.date)} tarihli <b>${money(t.amount)}</b> tutarındaki kayıt silinsin mi?`)) {
-        d.transactions = d.transactions.filter(x => x.id !== id); commit(); toast('Silindi');
+      // Düzenli ödemeden gelen son kayıt silinirse ödemenin tarihi de eski haline döner
+      const rec = t.recurringId && t.recPrev ? d.recurring.find(r => r.id === t.recurringId && r.lastPayTx === t.id) : null;
+      const extra = rec ? `<br><span class="muted">"${esc(rec.name)}" düzenli ödemesi de ödenmemiş sayılır, tarihi ${fmtDate(t.recPrev.nextDate)} olarak geri alınır.</span>` : '';
+      if (await confirmBox('İşlemi sil', `${fmtDate(t.date)} tarihli <b>${money(t.amount)}</b> tutarındaki kayıt silinsin mi?${extra}`)) {
+        if (rec) { rec.nextDate = t.recPrev.nextDate; rec.remaining = t.recPrev.remaining; rec.lastPayTx = null; }
+        d.transactions = d.transactions.filter(x => x.id !== id); commit(); toast(rec ? 'Silindi, ödeme geri alındı' : 'Silindi');
       }
       return;
     }
@@ -1186,7 +1228,7 @@ document.addEventListener('click', async e => {
     case 'new-rec': return recForm();
     case 'edit-rec': return recForm(findRec());
     case 'pay': return payRec(findRec());
-    case 'skip-rec': { const r = findRec(); advanceRec(r); commit(); return toast(r.nextDate ? `Atlandı. Sonraki: ${fmtDate(r.nextDate)}` : 'Atlandı'); }
+    case 'skip-rec': { const r = findRec(); advanceRec(r); r.lastPayTx = null; commit(); return toast(r.nextDate ? `Atlandı. Sonraki: ${fmtDate(r.nextDate)}` : 'Atlandı'); }
     case 'toggle-rec': { const r = findRec(); r.active = r.active === false; return commit(); }
     case 'del-rec': {
       const r = findRec();
@@ -1232,7 +1274,11 @@ document.addEventListener('click', async e => {
       return openModal({
         title: 'Kategoriyi yeniden adlandır',
         body: `<label class="field"><span>Ad</span><input class="input" name="name" value="${esc(c.name)}" required autofocus></label>`,
-        onSubmit: f => { c.name = val(f, 'name').trim(); commit(); }
+        onSubmit: f => {
+          const name = val(f, 'name').trim();
+          if (allCats().some(x => x.id !== c.id && x.name.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr'))) return fieldError(f, 'name', 'Bu adda bir kategori zaten var');
+          c.name = name; commit();
+        }
       });
     }
     case 'del-cat': {
@@ -1323,7 +1369,8 @@ function startupReminder() {
   const due = dueList(s.reminderDays || 3).filter(r => r.type !== 'income');
   if (!due.length) return;
   const late = due.filter(r => daysUntil(r.nextDate) < 0).length;
-  const body = due.slice(0, 4).map(r => `${r.name}: ${money(r.amount)} (${daysUntil(r.nextDate) < 0 ? 'gecikti' : daysUntil(r.nextDate) === 0 ? 'bugün' : fmtDate(r.nextDate)})`).join('\n');
+  const showAmt = !s.hideAmounts && !s.lock;
+  const body = due.slice(0, 4).map(r => `${r.name}${showAmt ? ': ' + money(r.amount) : ''} (${daysUntil(r.nextDate) < 0 ? 'gecikti' : daysUntil(r.nextDate) === 0 ? 'bugün' : fmtDate(r.nextDate)})`).join('\n');
   api.notify(late ? `${late} gecikmiş ödemen var` : `${due.length} ödeme yaklaşıyor`, body).catch(() => {});
   s.lastNotified = t;
   persist();
