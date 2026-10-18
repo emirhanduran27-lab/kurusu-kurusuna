@@ -1,7 +1,7 @@
 {
   "name": "kurusu-kurusuna",
   "productName": "Kuruşu Kuruşuna",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Gelir, gider, düzenli ödeme, bütçe ve birikim takibi",
   "main": "main.js",
   "author": "Emirhan Duran",
@@ -14,7 +14,8 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --publish never",
-    "release": "electron-builder --win nsis --publish always"
+    "release": "electron-builder --win nsis --publish always",
+    "dist:mac": "electron-builder --mac --publish never"
   },
   "dependencies": {
     "electron-updater": "6.8.9"
@@ -59,6 +60,32 @@
         "repo": "kurusu-kurusuna",
         "releaseType": "release"
       }
-    ]
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.finance",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "KurusuKurusuna-${version}-mac.${ext}"
+    },
+    "dmg": {
+      "title": "Kuruşu Kuruşuna ${version}",
+      "artifactName": "KurusuKurusuna-${version}-mac.${ext}"
+    }
   }
 }

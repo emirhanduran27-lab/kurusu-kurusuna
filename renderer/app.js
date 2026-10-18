@@ -168,6 +168,7 @@ function updateText() {
     case 'checking': return 'Yeni sürüm aranıyor…';
     case 'downloading': return `${u.version} sürümü indiriliyor… %${u.percent || 0}`;
     case 'ready': return `<span class="sav">${esc(u.version)} sürümü indirildi. Yeniden başlatınca kurulacak.</span>`;
+    case 'manual': return `<span class="sav">${esc(u.version)} sürümü çıktı. İndirip eskisinin yerine kurman yeterli, verilerin korunur.</span>`;
     case 'latest': return '<span class="pos">En güncel sürümü kullanıyorsun.</span>';
     case 'error': return `<span class="neg">Kontrol edilemedi. İnternet bağlantını kontrol et.</span>`;
     case 'dev': return 'Geliştirme modunda güncelleme kontrolü yapılmaz.';
@@ -176,6 +177,7 @@ function updateText() {
 }
 function updateButton() {
   if (S.update.status === 'ready') return '<button class="btn btn-primary" data-action="install-update">Yeniden başlat ve kur</button>';
+  if (S.update.status === 'manual') return '<button class="btn btn-primary" data-action="install-update">Yeni sürümü indir</button>';
   const busy = S.update.status === 'checking' || S.update.status === 'downloading';
   return `<button class="btn" data-action="check-update" ${busy ? 'disabled' : ''}>Güncellemeleri denetle</button>`;
 }
@@ -184,6 +186,7 @@ function refreshUpdateUI() {
   const bw = $('#updBtnWrap'); if (bw) bw.innerHTML = updateButton();
   const b = $('#updBanner');
   if (S.update.status === 'ready') { b.hidden = false; b.innerHTML = `<b>Yeni sürüm hazır (${esc(S.update.version)})</b>Kurmak için tıkla, program yeniden açılır.`; }
+  else if (S.update.status === 'manual') { b.hidden = false; b.innerHTML = `<b>Yeni sürüm çıktı (${esc(S.update.version)})</b>İndirme sayfasını açmak için tıkla.`; }
   else b.hidden = true;
 }
 
@@ -639,7 +642,7 @@ VIEWS.ayarlar = () => {
     <div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
       <button class="btn" data-action="open-repo">GitHub sayfası</button>
       <span id="updBtnWrap">${updateButton()}</span></div>
-    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. Yeni sürüm arka planda iner, program kapanınca kurulur. Verilerin güncellemeden etkilenmez.</div></div>
+    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. ${navigator.platform.startsWith('Mac') ? 'Mac\'te yeni sürüm bulununca indirme sayfası açılır.' : 'Yeni sürüm arka planda iner, program kapanınca kurulur.'} Verilerin güncellemeden etkilenmez.</div></div>
   </div>
   <p class="muted mt" id="appInfo" style="font-size:12px"></p>`;
 };
@@ -1110,7 +1113,7 @@ function startupReminder() {
   api.onUpdate?.(st => {
     const was = S.update.status;
     S.update = st; refreshUpdateUI();
-    if (st.status === 'ready' && was !== 'ready') toast(`${st.version} sürümü hazır`);
+    if ((st.status === 'ready' || st.status === 'manual') && was !== st.status) toast(`${st.version} sürümü ${st.status === 'ready' ? 'hazır' : 'çıktı'}`);
   });
   api.updateState?.().then(st => { if (st) { S.update = st; refreshUpdateUI(); } }).catch(() => {});
   setTimeout(startupReminder, 1200);

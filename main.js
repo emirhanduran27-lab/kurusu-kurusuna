@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, Notification, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, shell, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -48,6 +48,43 @@ function dailyBackup(data) {
 
 let win;
 
+// Mac'te menü olmadan Cmd+C, Cmd+V, Cmd+Q gibi kısayollar çalışmaz
+function setMacMenu() {
+  const name = 'Kuruşu Kuruşuna';
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: name, submenu: [
+      { role: 'about', label: `${name} Hakkında` },
+      { type: 'separator' },
+      { role: 'hide', label: `${name} Uygulamasını Gizle` },
+      { role: 'hideOthers', label: 'Diğerlerini Gizle' },
+      { role: 'unhide', label: 'Tümünü Göster' },
+      { type: 'separator' },
+      { role: 'quit', label: `${name} Uygulamasından Çık` }
+    ] },
+    { label: 'Düzen', submenu: [
+      { role: 'undo', label: 'Geri Al' },
+      { role: 'redo', label: 'Yinele' },
+      { type: 'separator' },
+      { role: 'cut', label: 'Kes' },
+      { role: 'copy', label: 'Kopyala' },
+      { role: 'paste', label: 'Yapıştır' },
+      { role: 'selectAll', label: 'Tümünü Seç' }
+    ] },
+    { label: 'Görünüm', submenu: [
+      { role: 'resetZoom', label: 'Gerçek Boyut' },
+      { role: 'zoomIn', label: 'Yakınlaştır' },
+      { role: 'zoomOut', label: 'Uzaklaştır' },
+      { type: 'separator' },
+      { role: 'togglefullscreen', label: 'Tam Ekran' }
+    ] },
+    { label: 'Pencere', submenu: [
+      { role: 'minimize', label: 'Küçült' },
+      { role: 'zoom', label: 'Büyüt' },
+      { role: 'close', label: 'Kapat' }
+    ] }
+  ]));
+}
+
 // Program eskiden "Gelir Gider" adını taşıyordu. Eski klasörde veri varsa yeni klasöre kopyala.
 function migrateOldData() {
   try {
@@ -70,11 +107,24 @@ function sendUpdate(state) {
   updateState = state;
   if (win && !win.isDestroyed()) win.webContents.send('update:state', state);
 }
+// Mac'te kendiliğinden kurulum yalnızca Apple imzalı programlarda çalışır.
+// Bu yüzden Mac'te yeni sürüm bulununca indirme sayfası gösterilir.
+const IS_MAC = process.platform === 'darwin';
+const RELEASES_URL = 'https://github.com/emirhanduran27-lab/kurusu-kurusuna/releases/latest';
 function setupUpdater() {
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoDownload = !IS_MAC;
+  autoUpdater.autoInstallOnAppQuit = !IS_MAC;
   autoUpdater.on('checking-for-update', () => sendUpdate({ status: 'checking' }));
-  autoUpdater.on('update-available', i => sendUpdate({ status: 'downloading', version: i.version, percent: 0 }));
+  autoUpdater.on('update-available', i => {
+    if (!IS_MAC) return sendUpdate({ status: 'downloading', version: i.version, percent: 0 });
+    const first = updateState.status !== 'manual';
+    sendUpdate({ status: 'manual', version: i.version });
+    if (first && Notification.isSupported()) {
+      const n = new Notification({ title: 'Kuruşu Kuruşuna', body: `${i.version} sürümü çıktı. İndirmek için tıkla.` });
+      n.on('click', () => shell.openExternal(RELEASES_URL));
+      n.show();
+    }
+  });
   autoUpdater.on('update-not-available', () => sendUpdate({ status: 'latest' }));
   autoUpdater.on('download-progress', p => sendUpdate({ status: 'downloading', version: updateState.version, percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded', i => {
@@ -122,6 +172,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.emirhan.gelirgider');
+    if (IS_MAC) setMacMenu();
     migrateOldData();
     setupUpdater();
 
@@ -174,7 +225,10 @@ if (!gotLock) {
     ipcMain.handle('app:info', () => ({ version: app.getVersion(), dataPath: dataFile() }));
     ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
     ipcMain.handle('update:state', () => updateState);
-    ipcMain.handle('update:install', () => { autoUpdater.quitAndInstall(false, true); });
+    ipcMain.handle('update:install', () => {
+      if (IS_MAC) return shell.openExternal(RELEASES_URL);
+      autoUpdater.quitAndInstall(false, true);
+    });
     ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url); });
 
     createWindow();

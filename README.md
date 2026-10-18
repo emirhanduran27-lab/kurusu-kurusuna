@@ -1,10 +1,22 @@
 # Kuruşu Kuruşuna
 
-Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows masaüstü uygulaması. Eski adı "Gelir Gider".
+Gelir, gider, düzenli ödeme, bütçe ve birikim takibi için Windows ve Mac masaüstü uygulaması. Eski adı "Gelir Gider".
 
 ## Kurulum
 
-[Releases](https://github.com/emirhanduran27-lab/kurusu-kurusuna/releases/latest) sayfasından `KurusuKurusuna-Kurulum-x.y.z.exe` dosyasını indirip çalıştır. Program sonraki sürümleri kendisi bulur ve kurar.
+[Releases](https://github.com/emirhanduran27-lab/kurusu-kurusuna/releases/latest) sayfasından indir.
+
+**Windows:** `KurusuKurusuna-Kurulum-x.y.z.exe` dosyasını çalıştır. "Bilinmeyen yayıncı" uyarısı çıkarsa "Ek bilgi" ve "Yine de çalıştır" de. Sonraki sürümler kendiliğinden iner ve kurulur.
+
+**Mac:** `KurusuKurusuna-x.y.z-mac.dmg` dosyasını aç, simgeyi Uygulamalar klasörüne sürükle. Hem Intel hem Apple Silicon (M1, M2, M3, M4) Mac'lerde çalışır. Program Apple tarafından imzalı olmadığı için ilk açılışta macOS engeller:
+1. Programı bir kez açmayı dene, uyarıyı kapat.
+2. Sistem Ayarları → Gizlilik ve Güvenlik bölümünün altında "Yine de Aç" düğmesine bas.
+
+"Hasarlı, çöp kutusuna taşıyın" uyarısı çıkarsa Terminal'de şunu çalıştırıp tekrar aç:
+```
+xattr -cr "/Applications/Kuruşu Kuruşuna.app"
+```
+Mac'te yeni sürüm çıktığında program haber verir ve indirme sayfasını açar. Yeni `.dmg` dosyasını eskisinin üzerine kurman yeterli, veriler korunur.
 
 ## Bölümler
 
@@ -19,7 +31,7 @@ Kısayollar: `G` yeni gelir, `N` yeni gider.
 
 ## Veriler
 
-Tüm veriler bilgisayarda kalır: `%APPDATA%\Kuruşu Kuruşuna\veri.json`. Her gün otomatik bir kopya `yedekler` klasörüne alınır (son 30 gün). "Gelir Gider" sürümünden geçenlerin verileri ilk açılışta kendiliğinden taşınır.
+Tüm veriler bilgisayarda kalır. Windows'ta `%APPDATA%\Kuruşu Kuruşuna\veri.json`, Mac'te `~/Library/Application Support/Kuruşu Kuruşuna/veri.json`. Her gün otomatik bir kopya `yedekler` klasörüne alınır (son 30 gün). "Gelir Gider" sürümünden geçenlerin verileri ilk açılışta kendiliğinden taşınır.
 
 ## Geliştirme
 
@@ -32,7 +44,7 @@ npm start
 
 1. `package.json` içindeki `version` değerini artır (örneğin `1.2.0`) ve değişiklikleri `main` dalına gönder.
 2. GitHub'da **Actions → Sürüm yayınla → Run workflow** düğmesine bas. Ya da aynı numarayla `v1.2.0` etiketi gönder.
-3. İş akışı kurulum dosyasını derleyip `v1.2.0` sürümü olarak Releases'e yükler. Kullanıcılardaki program birkaç saat içinde güncellemeyi bulur.
+3. İş akışı önce Windows, sonra Mac kurulum dosyasını derleyip `v1.2.0` sürümü olarak Releases'e yükler. Kullanıcılardaki program birkaç saat içinde güncellemeyi bulur.
 
 Sürüm numarası artırılmadan çalıştırılırsa yeni bir sürüm çıkmaz, var olan sürümün dosyaları yenilenir.
 

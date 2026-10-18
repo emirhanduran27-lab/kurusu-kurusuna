@@ -1,7 +1,8 @@
 name: Sürüm yayınla
 
-# "v1.2.0" gibi bir etiket gönderildiğinde Windows kurulum dosyasını derler
-# ve GitHub Releases'e yükler. Program güncellemeleri buradan alır.
+# "v1.2.0" gibi bir etiket gönderildiğinde ya da elle çalıştırıldığında
+# Windows ve Mac kurulum dosyalarını derler, GitHub Releases'e yükler.
+# Program güncellemeleri buradan alır.
 on:
   push:
     tags: ['v*']
@@ -23,7 +24,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Derle ve yayınla
+      - name: Derle ve yayınla (Windows)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,3 +34,23 @@ jobs:
         run: |
           if [ -z "$WIN_CSC_LINK" ]; then unset WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           npx electron-builder --win nsis --publish always
+
+  mac:
+    # Aynı sürüm sayfasını iki iş birden oluşturmaya çalışmasın diye Windows'tan sonra çalışır
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Derle ve yayınla (Mac)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --mac --publish always
