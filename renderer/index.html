@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self' https://api.github.com https://github.com">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self' https://api.github.com https://github.com https://hfeptlxxphvccfjrtmkv.supabase.co wss://hfeptlxxphvccfjrtmkv.supabase.co">
   <title>Kuruşu Kuruşuna</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -20,6 +20,7 @@
       <div class="brand-tools">
         <button class="tool-btn" data-action="toggle-hide" title="Tutarları gizle (H)"></button>
         <button class="tool-btn lock-btn" data-action="lock-now" title="Şimdi kilitle" hidden></button>
+        <button class="tool-btn sync-btn" data-action="sync-now" title="Eşitle" hidden>☁</button>
       </div>
       <nav class="nav" id="nav">
         <button data-view="ozet" class="active"><span class="ico">◧</span>Özet</button>
@@ -45,6 +46,7 @@
       <div class="mtop-title"><b>Kuruşu Kuruşuna</b><span id="mBalance"></span></div>
       <button class="tool-btn" data-action="toggle-hide" aria-label="Tutarları gizle"></button>
       <button class="tool-btn lock-btn" data-action="lock-now" aria-label="Kilitle" hidden></button>
+      <button class="tool-btn sync-btn" data-action="sync-now" aria-label="Eşitle" hidden>☁</button>
       <button class="tool-btn" data-view="ayarlar" aria-label="Ayarlar">⚙</button>
     </header>
 
@@ -92,8 +94,10 @@
 
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/mobile-bridge.js"></script>
+  <script src="vendor/cloud.js"></script>
   <script src="app.js"></script>
   <script src="features.js"></script>
+  <script src="sync.js"></script>
   <script src="boot.js"></script>
 </body>
 </html>

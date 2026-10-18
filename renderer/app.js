@@ -159,6 +159,7 @@ const S = {
 let saveTimer;
 function persist() {
   clearTimeout(saveTimer);
+  if (!S.applyingRemote) { markLocalEdit(); scheduleSync(); }
   saveTimer = setTimeout(() => {
     api.save(S.data).catch(() => toast('Kaydedilemedi!'));
     // Telefonda uygulama kapalıyken de hatırlatma gelsin diye bildirimler önceden planlanır
@@ -710,7 +711,8 @@ VIEWS.ayarlar = () => {
     </span>`).join('');
   const hasSample = d.transactions.some(t => t.sample) || d.goals.some(g => g.sample) || d.recurring.some(r => r.sample) || d.transfers.some(t => t.sample) || d.debts.some(x => x.sample);
   return `<div class="page-head"><h1>Ayarlar</h1></div>
-  <div class="grid g2">
+  ${syncCardHtml()}
+  <div class="grid g2 mt">
     <div class="card">
       <h2>Genel</h2>
       <div class="set-row"><div class="main-col"><b>Tema</b><div class="muted">Koyu ya da açık görünüm</div></div>
@@ -761,19 +763,21 @@ AFTER.ayarlar = () => {
 };
 
 /* ---------- Modal ---------- */
-function openModal({ title, body, submit = 'Kaydet', danger = false, onSubmit, onOpen, wide = false, noFoot = false }) {
+function openModal({ title, body, submit = 'Kaydet', danger = false, onSubmit, onOpen, wide = false, noFoot = false, sticky = false }) {
   const dlg = $('#modal');
+  dlg.dataset.sticky = sticky ? '1' : '';
+  $('.modal-head [data-close]').hidden = sticky;
   $('#modalTitle').textContent = title;
   $('#modalBody').innerHTML = body;
   $('#modalFoot').innerHTML = noFoot ? '<button type="button" class="btn" data-close>Kapat</button>'
-    : `<button type="button" class="btn btn-ghost" data-close>Vazgeç</button><button type="submit" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${submit}</button>`;
+    : `${sticky ? '' : '<button type="button" class="btn btn-ghost" data-close>Vazgeç</button>'}<button type="submit" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${submit}</button>`;
   dlg.style.width = wide ? 'min(680px, 94vw)' : '';
   const form = $('#modalForm');
   form.onsubmit = e => {
     e.preventDefault();
     if (!onSubmit) return dlg.close();
     const res = onSubmit(form);
-    if (res !== false) dlg.close();
+    if (res !== false) { dlg.dataset.sticky = ''; dlg.close(); }
   };
   if (!dlg.open) dlg.showModal();
   onOpen?.(form);
@@ -781,13 +785,19 @@ function openModal({ title, body, submit = 'Kaydet', danger = false, onSubmit, o
   first?.focus(); first?.select?.();
 }
 $('#modal').addEventListener('click', e => {
+  if ($('#modal').dataset.sticky) return;
   if (e.target.closest('[data-close]') || e.target === e.currentTarget) $('#modal').close();
 });
+// Kapatılamaz pencerelerde Esc tuşu da çalışmaz
+$('#modal').addEventListener('cancel', e => { if ($('#modal').dataset.sticky) e.preventDefault(); });
 function confirmBox(title, text, submit = 'Sil') {
   return new Promise(res => {
     let ok = false;
+    const dlg = $('#modal');
     openModal({ title, body: `<p style="margin:0">${text}</p>`, submit, danger: true, onSubmit: () => { ok = true; } });
-    $('#modal').addEventListener('close', () => res(ok), { once: true });
+    // Önceki pencerenin geç gelen "kapandı" olayı bu pencereyi kapatmış sayılmasın
+    const onClose = () => { if (dlg.open) return; dlg.removeEventListener('close', onClose); res(ok); };
+    dlg.addEventListener('close', onClose);
   });
 }
 const val = (f, n) => f.elements[n]?.value ?? '';
@@ -1221,7 +1231,7 @@ function verifyThen(title, next) {
 // Yedeklerde kilit bilgisi taşınmaz; kilit her cihazın kendine ait
 function exportable() {
   const c = JSON.parse(JSON.stringify(S.data));
-  delete c.settings.lock; delete c.settings.lastNotified;
+  delete c.settings.lock; delete c.settings.lastNotified; delete c.sync;
   return c;
 }
 
@@ -1363,9 +1373,11 @@ document.addEventListener('click', async e => {
       const imported = await api.importJson();
       if (!imported) return;
       if (!imported.transactions || !imported.categories) return toast('Bu dosya geçerli bir yedek değil');
-      if (await confirmBox('Yedekten geri yükle', `Yedekte ${imported.transactions.length} işlem var. Mevcut verilerin yerine yüklensin mi?`, 'Geri yükle')) {
-        const keep = { lock: S.data.settings.lock, hideAmounts: S.data.settings.hideAmounts };
-        S.data = normalize(imported); Object.assign(S.data.settings, keep); commit(); toast('Yedek yüklendi');
+      if (await confirmBox('Yedekten geri yükle', `Yedekte ${imported.transactions.length} işlem var. Mevcut verilerin yerine yüklensin mi?${S.data.sync ? ' Hesabına bağlı diğer cihazlardaki veriler de bu yedekle değişir.' : ''}`, 'Geri yükle')) {
+        const keep = { lock: S.data.settings.lock, hideAmounts: S.data.settings.hideAmounts }, sync = S.data.sync;
+        S.data = normalize(imported); delete S.data.sync; Object.assign(S.data.settings, keep);
+        if (sync) S.data.sync = sync;
+        commit(); toast('Yedek yüklendi');
       }
       return;
     }
@@ -1387,9 +1399,10 @@ document.addEventListener('click', async e => {
     case 'wipe':
       return openModal({
         title: 'Tüm verileri sil', submit: 'Her şeyi sil', danger: true,
-        body: '<p style="margin:0">Tüm işlemler, düzenli ödemeler, hedefler ve ayarlar silinecek. Onaylamak için kutuya <b>SİL</b> yaz.</p><input class="input" name="confirm" autocomplete="off" required>',
+        body: `<p style="margin:0">Bu cihazdaki tüm işlemler, düzenli ödemeler, hedefler ve ayarlar silinecek.${d.sync ? ' Hesabından da çıkılır, buluttaki verilerin silinmez.' : ''} Onaylamak için kutuya <b>SİL</b> yaz.</p><input class="input" name="confirm" autocomplete="off" required>`,
         onSubmit: f => {
           if (val(f, 'confirm').trim().toLocaleUpperCase('tr') !== 'SİL') return fieldError(f, 'confirm', 'Onay için SİL yaz');
+          if (d.sync) { SYNC.cloud?.signOut().catch(() => {}); SYNC.user = null; SYNC.dek = null; }
           S.data = defaultData(); S.view = 'ozet'; commit(); toast('Tüm veriler silindi');
         }
       });
@@ -1400,7 +1413,7 @@ document.addEventListener('click', async e => {
 
 window.addEventListener('kk-back', e => {
   if (S.locked) return;
-  if ($('#modal').open) { $('#modal').close(); e.preventDefault(); return; }
+  if ($('#modal').open) { if (!$('#modal').dataset.sticky) $('#modal').close(); e.preventDefault(); return; }
   if (S.view !== 'ozet') { S.view = 'ozet'; render(); e.preventDefault(); }
 });
 

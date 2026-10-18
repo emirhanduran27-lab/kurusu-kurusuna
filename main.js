@@ -259,12 +259,25 @@ function createWindow() {
   win.webContents.session.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'notifications'));
 }
 
+// Google ile giriş ve e-posta doğrulamasından sonra kurusukurusuna://auth?code=... ile uygulamaya dönülür
+const SCHEME = 'kurusukurusuna';
+if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient(SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+else app.setAsDefaultProtocolClient(SCHEME);
+let pendingLink = (process.argv.find(a => a.startsWith(SCHEME + '://')) || null);
+function deliverLink(url) {
+  if (!url || !url.startsWith(SCHEME + '://')) return;
+  if (win && !win.isDestroyed()) { win.webContents.send('deeplink', url); if (win.isMinimized()) win.restore(); win.focus(); }
+  else pendingLink = url;
+}
+app.on('open-url', (e, url) => { e.preventDefault(); deliverLink(url); });
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+    deliverLink(argv.find(a => a.startsWith(SCHEME + '://')));
   });
 
   app.whenReady().then(() => {
@@ -332,7 +345,8 @@ if (!gotLock) {
     ipcMain.handle('bio:prompt', async (_e, reason) => {
       try { await systemPreferences.promptTouchID(String(reason || 'Kilidi aç')); return true; } catch { return false; }
     });
-    ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/github\.com\//.test(url)) shell.openExternal(url); });
+    ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) shell.openExternal(url); });
+    ipcMain.handle('deeplink:pending', () => { const u = pendingLink; pendingLink = null; return u; });
 
     createWindow();
     // Açılıştan birkaç saniye sonra, sonra da 6 saatte bir kontrol et

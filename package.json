@@ -1,7 +1,7 @@
 {
   "name": "kurusu-kurusuna",
   "productName": "Kuruşu Kuruşuna",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Gelir, gider, düzenli ödeme, bütçe ve birikim takibi",
   "main": "main.js",
   "author": "Emirhan Duran",
@@ -16,7 +16,7 @@
     "dist": "electron-builder --win nsis --publish never",
     "release": "electron-builder --win nsis --publish always",
     "dist:mac": "electron-builder --mac --publish never",
-    "bridge": "esbuild mobile/bridge.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/mobile-bridge.js",
+    "bridge": "esbuild mobile/bridge.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/mobile-bridge.js && esbuild mobile/cloud.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/cloud.js",
     "mobile:sync": "npm run bridge && node scripts/sync-ios-version.js && cap sync",
     "android": "npm run mobile:sync && cd android && ./gradlew assembleRelease"
   },
@@ -34,6 +34,7 @@
     "@capacitor/ios": "^8.5.3",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/share": "^8.0.3",
+    "@supabase/supabase-js": "^2.118.0",
     "chart.js": "4.5.1",
     "electron": "38.8.6",
     "electron-builder": "26.0.20",
@@ -100,6 +101,14 @@
     "dmg": {
       "title": "Kuruşu Kuruşuna ${version}",
       "artifactName": "KurusuKurusuna-${version}-mac.${ext}"
-    }
+    },
+    "protocols": [
+      {
+        "name": "Kuruşu Kuruşuna",
+        "schemes": [
+          "kurusukurusuna"
+        ]
+      }
+    ]
   }
 }

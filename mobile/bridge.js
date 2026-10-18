@@ -135,7 +135,11 @@ if (Capacitor.isNativePlatform()) {
     checkUpdate: async () => { checkUpdate(); return true; },
     updateState: async () => updateState,
     installUpdate: async () => { if (updateState.url) await Browser.open({ url: updateState.url }); },
-    openUrl: async url => { if (/^https:\/\/github\.com\//.test(url)) await Browser.open({ url }); },
+    openUrl: async url => { if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) await Browser.open({ url }); },
+    onDeepLink: cb => {
+      App.addListener('appUrlOpen', ({ url }) => { if (url && url.startsWith('kurusukurusuna://')) { Browser.close().catch(() => {}); cb(url); } });
+      App.getLaunchUrl().then(r => { if (r?.url?.startsWith('kurusukurusuna://')) cb(r.url); }).catch(() => {});
+    },
     onUpdate: cb => { updateCb = cb; },
     bioAvailable: async () => {
       try { const r = await BiometricAuth.checkBiometry(); return r.isAvailable ? { available: true, label: bioLabel(r.biometryType) } : { available: false }; }

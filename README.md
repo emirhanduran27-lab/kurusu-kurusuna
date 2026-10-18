@@ -22,9 +22,17 @@ Program Uygulamalar klasöründen çalışmalı. Doğrudan `.dmg` içinden açı
 
 **iPhone:** Apple geliştirici hesabı aktif olunca TestFlight ya da App Store üzerinden dağıtılacak.
 
-## Telefon ile bilgisayar arasında veri aktarma
+## Hesap ve eşitleme
 
-Veriler her cihazda ayrı tutulur. Aktarmak için Ayarlar → Yedek al (telefonda Paylaş) ile yedek dosyası oluştur, diğer cihazda Ayarlar → Yedekten geri yükle ile aç. Kilit ve gizleme ayarı her cihazın kendine aittir, yedekle taşınmaz.
+Ayarlar → Hesap ve eşitleme bölümünden e-posta ya da Google ile hesap açılır. Aynı hesapla giriş yapılan bilgisayar ve telefonlarda veriler aynı olur. Hesap isteğe bağlıdır; açmayan kişi her şeyi sadece kendi cihazında tutmaya devam eder.
+
+- **Uçtan uca şifreleme:** Veriler cihazdan çıkmadan önce AES-256 ile şifrelenir. Anahtar, kullanıcının belirlediği **veri parolası** ile kilitlenir. Sunucuda (Supabase) sadece okunamayan metin durur, uygulamanın sahibi de dahil kimse verileri göremez.
+- **Kurtarma anahtarı:** Veri parolası belirlenirken bir kez gösterilir. Veri parolası unutulursa veriler sadece bununla açılabilir.
+- **İnternetsiz çalışma:** Kayıtlar önce cihaza yazılır, bağlantı gelince eşitlenir. İki cihazda aynı kayıt değiştirildiyse en son düzenleme kazanır.
+- **Cihaza özel ayarlar:** Tema, uygulama kilidi ve tutar gizleme eşitlenmez.
+- Sunucu tarafı kurulumu `supabase/kurulum.sql` dosyasındadır.
+
+Hesap açmadan veri taşımak için yedek dosyası da kullanılabilir: Ayarlar → Yedek al, diğer cihazda Yedekten geri yükle.
 
 ## Güvenlik ve gizlilik
 

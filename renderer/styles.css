@@ -428,6 +428,19 @@ body.locked .app { visibility: hidden; }
   .bud-table .c-bar:empty { display: none; }
 }
 
+/* Hesap ve eşitleme */
+.oauth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 11px; background: var(--panel); }
+.g-logo { width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #4285f4; font-weight: 800; display: grid; place-items: center; font-size: 14px; }
+.or-line { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.or-line::before, .or-line::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.recovery-key { font-family: ui-monospace, Consolas, monospace; font-size: 19px; font-weight: 700; letter-spacing: 1px; text-align: center; padding: 14px; border-radius: 10px; background: var(--panel-2); border: 1px dashed var(--accent); user-select: all; word-break: break-all; }
+.sync-btn.err { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 50%, transparent); }
+.sync-btn.spin { animation: syncpulse 1s ease-in-out infinite; }
+@keyframes syncpulse { 50% { opacity: .4; } }
+.danger-item b { color: var(--expense); }
+.form-msg { color: var(--expense); font-size: 13px; font-weight: 600; min-height: 0; }
+.form-msg:empty { display: none; }
+
 /* Hesaplar, net varlık, bölüşme, Diğer menüsü */
 .acc-ico { font-size: 20px; width: 28px; text-align: center; flex: none; }
 .acc-card .goal-amt small { font-size: 13px; }
