@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   exportJson: (data) => ipcRenderer.invoke('data:export', data),
   importJson: () => ipcRenderer.invoke('data:import'),
   exportCsv: (csv, name) => ipcRenderer.invoke('csv:export', csv, name),
+  saveFile: (name, bytes, title) => ipcRenderer.invoke('file:save', name, bytes, title),
   notify: (title, body) => ipcRenderer.invoke('notify', title, body),
   alert: (title, body) => ipcRenderer.invoke('notify', title, body),
   httpGet: (url) => ipcRenderer.invoke('http:get', url),

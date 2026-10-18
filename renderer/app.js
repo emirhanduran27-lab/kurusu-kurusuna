@@ -345,6 +345,7 @@ VIEWS.ozet = () => {
       <div class="btns">
         <button class="btn btn-income" data-action="new-income">+ İlk gelirini ekle</button>
         <button class="btn btn-expense" data-action="new-expense">+ İlk giderini ekle</button>
+        <button class="btn" data-action="import-statement">Banka ekstresi içe aktar</button>
         <button class="btn" data-action="load-sample">Örnek verilerle dene</button>
       </div>
     </div>`;
@@ -368,6 +369,7 @@ VIEWS.ozet = () => {
     <div class="card stat"><div class="label"><span class="dot" style="background:var(--saving)"></span>Birikime aktarılan</div><div class="value sav">${money(st.saved)}</div><div class="sub">Toplam birikim ${money(totalSaved())}</div></div>
     <div class="card stat"><div class="label"><span class="dot" style="background:var(--muted)"></span>Ay sonu kalan</div><div class="value ${st.left < 0 ? 'neg' : ''}">${money(st.left)}</div><div class="sub">Tasarruf oranı %${rate}</div></div>
   </div>
+  ${insightsCardHtml()}
 
   <div class="grid g2 mt">
     <div class="card">
@@ -480,6 +482,7 @@ VIEWS.islemler = () => {
   list.forEach(t => { if (t.type === 'income') inc += t.amount; else exp += t.amount; });
   const catOpts = (type) => catsOf(type).map(c => `<option value="${c.id}" ${f.cat === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   return `<div class="page-head"><h1>İşlemler</h1>${f.month === 'all' ? '' : monthNav('tx')}<div class="spacer"></div>
+    <button class="btn" data-action="import-statement">Ekstre içe aktar</button>
     <button class="btn" data-action="export-csv">CSV dışa aktar</button>
     <button class="btn btn-income" data-action="new-income">+ Gelir</button>
     <button class="btn btn-expense" data-action="new-expense">+ Gider</button></div>
@@ -633,7 +636,7 @@ VIEWS.butce = () => {
   const yInc = ys.reduce((s, x) => s + x.inc, 0), yExp = ys.reduce((s, x) => s + x.exp, 0), ySav = ys.reduce((s, x) => s + x.saved, 0);
   const activeMonths = ys.filter(x => x.inc || x.exp).length || 1;
 
-  return `<div class="page-head"><h1>Bütçe ve Raporlar</h1>${monthNav('butce')}<div class="spacer"></div></div>
+  return `<div class="page-head"><h1>Bütçe ve Raporlar</h1>${monthNav('butce')}<div class="spacer"></div><button class="btn" data-action="report-pdf">Aylık rapor (PDF)</button></div>
   <div class="card">
     <h2>${monthLabel(S.month)} bütçesi<span class="spacer"></span><span class="muted" style="font-weight:500">Limitli kategoriler: <b class="${totLim && totSpent > totLim ? 'neg' : ''}">${money(totSpent)}</b> / ${money(totLim)}</span></h2>
     <p class="muted" style="margin:-4px 0 12px;font-size:12.5px">Limit kutusuna aylık üst sınırı yaz. Limitler her ay için geçerlidir. Boş bırakılan kategoriler takip edilmez.</p>
@@ -740,6 +743,7 @@ VIEWS.ayarlar = () => {
       <h2>Veriler</h2>
       <div class="set-row"><div class="main-col"><b>Yedek al</b><div class="muted">${api.platform ? 'Yedek dosyasını Drive, e-posta ya da mesajla gönder. Bilgisayara aktarmak için de bunu kullan.' : 'Tüm verileri tek bir JSON dosyasına kaydet. Telefona aktarmak için de bunu kullan.'}</div></div><button class="btn" data-action="backup">${api.platform ? 'Paylaş' : 'Yedek al'}</button></div>
       <div class="set-row"><div class="main-col"><b>Yedekten geri yükle</b><div class="muted">Mevcut verilerin yerine yedek dosyası yüklenir</div></div><button class="btn" data-action="restore">Geri yükle</button></div>
+      <div class="set-row"><div class="main-col"><b>Banka ekstresi içe aktar</b><div class="muted">Bankadan indirdiğin Excel ya da CSV hesap hareketlerini işlemlere ekle</div></div><button class="btn" data-action="import-statement">İçe aktar</button></div>
       <div class="set-row"><div class="main-col"><b>Excel için dışa aktar</b><div class="muted">Tüm işlemleri CSV olarak ${api.platform ? 'paylaş' : 'kaydet'}</div></div><button class="btn" data-action="export-csv-all">CSV</button></div>
       ${api.platform ? '' : '<div class="set-row"><div class="main-col"><b>Veri klasörü</b><div class="muted">Otomatik günlük yedekler burada tutulur (son 30 gün)</div></div><button class="btn" data-action="open-folder">Klasörü aç</button></div>'}
       ${hasSample ? '<div class="set-row"><div class="main-col"><b>Örnek veriler</b><div class="muted">Denemek için yüklenen örnek kayıtları kaldır</div></div><button class="btn" data-action="clear-sample">Örnekleri sil</button></div>' : ''}
@@ -787,7 +791,8 @@ function openModal({ title, body, submit = 'Kaydet', danger = false, onSubmit, o
   $('#modalBody').innerHTML = body;
   $('#modalFoot').innerHTML = noFoot ? '<button type="button" class="btn" data-close>Kapat</button>'
     : `${sticky ? '' : '<button type="button" class="btn btn-ghost" data-close>Vazgeç</button>'}<button type="submit" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${submit}</button>`;
-  dlg.style.width = wide ? 'min(680px, 94vw)' : '';
+  dlg.classList.toggle('xl', wide === 'xl');
+  dlg.style.width = wide && wide !== 'xl' ? 'min(680px, 94vw)' : '';
   const form = $('#modalForm');
   form.onsubmit = e => {
     e.preventDefault();

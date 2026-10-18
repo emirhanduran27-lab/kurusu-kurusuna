@@ -52,6 +52,8 @@ Program açılışta ve açık kaldığı sürece 6 saatte bir yeni sürüme bak
 - **Döviz ve Altın**: Dolar, euro, sterlin, frank, gram/22 ayar/çeyrek/yarım/tam/Cumhuriyet altını ve gümüş. Alış ve satışlar, ortalama maliyet, güncel kurla değer ve kâr/zarar. Kurlar ECB (günlük) ve gold-api.com'dan alınır, istenirse elle düzeltilir.
 - **Hızlı şablonlar**: Sık girilen harcamalar Özet ve İşlemler sayfasının üstünde tek dokunuşla eklenir, "Geri al" ile geri alınır.
 - **Bütçe uyarısı**: Bir kategoride aylık limitin %80'ine ve %100'üne ulaşınca bildirim.
+- **Banka ekstresi içe aktarma**: Bankadan indirilen Excel (xlsx, xls) ya da CSV hesap hareketleri işlemlere eklenir. Sütunlar otomatik tanınır, kategoriler tahmin edilir, daha önce eklenmiş satırlar ve kart ödemesi gibi transferler işaretlenir. Aynı bankanın dosyası bir dahaki sefere aynı ayarlarla açılır.
+- **İçgörüler ve aylık PDF rapor**: Özet sayfasında ay sonu tahmini, bütçe aşımları, ortalamadan sapan kategoriler ve birikim hedeflerinin ne zaman tamamlanacağı gibi notlar. Bütçe ve Raporlar sayfasından istenen ay için PDF rapor alınır.
 - **Borç ve Alacak**: Kime ne borçlusun, kim sana borçlu. Kısmi ödemeler, vade hatırlatması. Gider eklerken "Başkalarıyla bölüş" ile arkadaşların payı alacak olarak kaydedilir.
 - **İşlemler**: Gelir ve gider kayıtları. Arama, ay, tür, kategori ve ödeme yöntemine göre filtre. CSV (Excel) dışa aktarma.
 - **Düzenli Ödemeler**: Kira, fatura, abonelik, taksit, maaş gibi tekrarlayan kalemler. "Ödendi" deyince işlem olarak eklenir ve tarih ileri alınır. Açılışta yaklaşan ödemeler için Windows bildirimi gelir.

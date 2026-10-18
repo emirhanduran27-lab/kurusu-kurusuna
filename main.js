@@ -324,6 +324,22 @@ if (!gotLock) {
       return true;
     });
 
+    // PDF rapor gibi ikili dosyalar: kaydedilir ve varsayılan programla açılır
+    ipcMain.handle('file:save', async (_e, name, bytes, title) => {
+      const safe = String(name || 'dosya').replace(/[\\/:*?"<>|]/g, '-').slice(0, 120);
+      const ext = (safe.match(/\.([a-z0-9]{1,5})$/i) || [, 'pdf'])[1].toLowerCase();
+      if (!['pdf'].includes(ext)) throw new Error('izin yok');
+      const r = await dialog.showSaveDialog(win, {
+        title: title || 'Kaydet',
+        defaultPath: path.join(app.getPath('documents'), safe),
+        filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+      });
+      if (r.canceled || !r.filePath) return false;
+      fs.writeFileSync(r.filePath, Buffer.from(bytes));
+      if (/\.pdf$/i.test(r.filePath)) shell.openPath(r.filePath);
+      return true;
+    });
+
     ipcMain.handle('notify', (_e, title, body) => {
       if (!Notification.isSupported()) return false;
       const n = new Notification({ title, body, icon: path.join(__dirname, 'build', 'icon.png') });

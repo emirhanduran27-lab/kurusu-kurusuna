@@ -483,3 +483,41 @@ body.locked .app { visibility: hidden; }
 .more-item.active { border-color: var(--accent); }
 .hide-amounts .networth b { filter: blur(7px); }
 @media (max-width: 760px) { .split-row { grid-template-columns: 1fr 100px auto; } .rate { flex: 1 1 calc(50% - 8px); min-width: 0; } }
+
+/* Ekstre içe aktarma */
+dialog.xl { width: min(980px, 96vw); }
+.imp-file { font-size: 12.5px; margin-top: -4px; }
+.imp-map { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--panel-2); }
+.imp-map summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+.imp-map[open] summary { margin-bottom: 10px; }
+.imp-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; }
+.imp-sum .spacer { flex: 1; }
+.imp-list { border: 1px solid var(--line); border-radius: 12px; max-height: 46vh; overflow-y: auto; }
+.imp-row { display: grid; grid-template-columns: 22px 1fr 190px 120px; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.imp-row:last-child { border-bottom: 0; }
+.imp-row.off { opacity: .45; }
+.imp-row input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--saving); }
+.imp-main { min-width: 0; }
+.imp-desc { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-meta { font-size: 12px; color: var(--muted); }
+.imp-cat { padding: 6px 8px; font-size: 13px; }
+.imp-amt { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.imp-list .empty { padding: 24px; }
+
+/* İçgörüler */
+.ins-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ins { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; }
+.ins-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--saving); }
+.ins.bad .ins-dot { background: var(--expense); }
+.ins.good .ins-dot { background: var(--income); }
+
+@media (max-width: 760px) {
+  dialog.xl { width: 100vw; }
+  .imp-list { max-height: 50vh; }
+  .imp-row { grid-template-columns: 22px 1fr auto; grid-template-areas: "c m a" "c s s"; row-gap: 6px; }
+  .imp-row > input { grid-area: c; align-self: start; margin-top: 3px; }
+  .imp-main { grid-area: m; }
+  .imp-cat { grid-area: s; font-size: 14px; }
+  .imp-amt { grid-area: a; }
+}
+.ins b.money { font-weight: 600; }

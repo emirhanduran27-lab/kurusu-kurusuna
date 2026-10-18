@@ -128,6 +128,13 @@ if (Capacitor.isNativePlatform()) {
       try { return JSON.parse(t); } catch { return {}; }
     },
     exportCsv: (csv, name) => shareFile(name || 'islemler.csv', '﻿' + csv, 'CSV paylaş'),
+    saveFile: async (name, bytes, title) => {
+      let bin = ''; const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+      await Filesystem.writeFile({ path: name, data: btoa(bin), directory: Directory.Cache, recursive: true });
+      const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+      try { await Share.share({ title: title || name, files: [uri], dialogTitle: title || name }); return true; } catch { return false; }
+    },
     notify: async () => false, // telefonda hatırlatmalar önceden planlandığı için anlık bildirim gerekmez
     alert: async (title, body) => {
       if (!(await notifPermission())) return false;
