@@ -87,4 +87,8 @@ Sürüm numarası artırılmadan çalıştırılırsa yeni bir sürüm çıkmaz,
 
 ## Kod imzalama
 
-Kurulum dosyası şu an imzasız. Emirhan Duran adına kod imzalama sertifikası ya da imzalama hizmeti alındığında iş akışına imzalama adımı eklenecek. İş akışı `.pfx` dosyası için `WIN_CSC_LINK` ve `WIN_CSC_KEY_PASSWORD` secret'larını şimdiden tanıyor.
+**Mac:** Sürümler Emirhan Duran adına Developer ID sertifikasıyla imzalanır ve Apple tarafından onaylanır (notarization). Bu yüzden Mac'te uyarı çıkmadan açılır. İş akışı `APPLE_CSC_P12_BASE64`, `APPLE_CSC_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID` ve `APPLE_API_ISSUER` secret'larını kullanır. Bunlar yoksa imzasız derler. Mac güncelleyicisi, imzalı bir sürümden sonra yalnızca aynı geliştirici imzasını taşıyan sürümleri kurar.
+
+**iPhone:** Her sürümde iOS uygulaması derlenip App Store Connect'e yüklenir ve TestFlight'ta görünür. Bunun için ayrıca `APPLE_TEAM_ID` secret'ı gerekir.
+
+**Windows:** Kurulum dosyası şu an imzasız. İş akışı `.pfx` dosyası için `WIN_CSC_LINK` ve `WIN_CSC_KEY_PASSWORD` secret'larını şimdiden tanıyor.

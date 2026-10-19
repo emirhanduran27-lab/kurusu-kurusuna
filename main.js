@@ -152,6 +152,19 @@ function installUpdate() {
   autoUpdater.quitAndInstall(true, true);
 }
 
+// Bir .app paketinin Apple geliştirici kimliği (Team ID). İmzasızsa ya da imza bozuksa null
+function teamOf(appPath, strict = false) {
+  return new Promise(resolve => {
+    const check = () => execFile('/usr/bin/codesign', ['-dv', appPath], (e, _o, err) => {
+      if (e) return resolve(null);
+      const m = String(err).match(/TeamIdentifier=([A-Z0-9]{10})/);
+      resolve(m ? m[1] : null);
+    });
+    if (!strict) return check();
+    execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath], e => e ? resolve(null) : check());
+  });
+}
+
 /* Mac için kendi güncelleyicimiz: zip'i indirir, doğrular, açar,
    program kapanırken eski .app'i yenisiyle değiştirip yeniden başlatır. */
 const macUpdate = {
@@ -195,6 +208,12 @@ const macUpdate = {
       await new Promise((r, j) => execFile('/usr/bin/ditto', ['-x', '-k', zip, unpack], e => e ? j(e) : r()));
       const name = fs.readdirSync(unpack).find(n => n.endsWith('.app'));
       if (!name) throw new Error('Zip içinde program bulunamadı');
+      // Çalışan program Apple imzalıysa yeni sürüm de aynı geliştiricinin imzasını taşımalı
+      const mine = await teamOf(this.appPath());
+      if (mine) {
+        const theirs = await teamOf(path.join(unpack, name), true);
+        if (theirs !== mine) throw new Error('Yeni sürümün imzası doğrulanamadı');
+      }
       this.ready = { version: info.version, newApp: path.join(unpack, name) };
       sendUpdate({ status: 'ready', version: info.version });
       notifyReady(info.version);

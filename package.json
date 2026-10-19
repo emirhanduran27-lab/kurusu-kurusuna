@@ -1,7 +1,7 @@
 {
   "name": "kurusu-kurusuna",
   "productName": "Kuruşu Kuruşuna",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Gelir, gider, düzenli ödeme, bütçe ve birikim takibi",
   "main": "main.js",
   "author": "Emirhan Duran",
@@ -96,10 +96,12 @@
       ],
       "icon": "build/icon-mac.png",
       "category": "public.app-category.finance",
-      "identity": "-",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "artifactName": "KurusuKurusuna-${version}-mac.${ext}"
+      "artifactName": "KurusuKurusuna-${version}-mac.${ext}",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "dmg": {
       "title": "Kuruşu Kuruşuna ${version}",
