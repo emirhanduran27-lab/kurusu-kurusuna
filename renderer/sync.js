@@ -233,7 +233,8 @@ function authForm(mode) {
   const signup = mode === 'signup';
   openModal({
     title: signup ? 'Hesap aç' : 'Giriş yap',
-    body: `<button type="button" class="btn oauth-btn" data-oauth="google"><span class="g-logo">G</span> Google ile devam et</button>
+    body: `${api.appleSignIn ? '<button type="button" class="btn oauth-btn apple-btn" data-apple><span class="a-logo"></span> Apple ile devam et</button>' : ''}
+      <button type="button" class="btn oauth-btn" data-oauth="google"><span class="g-logo">G</span> Google ile devam et</button>
       <div class="or-line"><span>ya da e-posta ile</span></div>
       <label class="field"><span>E-posta</span><input class="input" name="email" type="email" autocomplete="email" required autofocus></label>
       <label class="field"><span>Parola</span><input class="input" name="password" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required></label>
@@ -245,6 +246,7 @@ function authForm(mode) {
     onOpen: f => {
       $('[data-switch]', f).addEventListener('click', () => authForm(signup ? 'login' : 'signup'));
       $('[data-oauth]', f).addEventListener('click', () => oauthStart('google'));
+      $('[data-apple]', f)?.addEventListener('click', () => appleStart());
       $('[data-forgot]', f)?.addEventListener('click', async () => {
         const email = val(f, 'email').trim();
         if (!email) { $('#authMsg').textContent = 'Önce e-posta adresini yaz.'; return; }
@@ -270,6 +272,21 @@ function authForm(mode) {
 }
 function infoBox(title, html) { openModal({ title, noFoot: true, body: `<p style="margin:0">${html}</p>` }); }
 
+const b64url = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// iPhone'da Apple ile giriş: sistemin kendi penceresi açılır, dönen kimlik Supabase'e verilir
+async function appleStart() {
+  const raw = b64url(crypto.getRandomValues(new Uint8Array(24)));
+  const hashed = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    const r = await api.appleSignIn(hashed);
+    await SYNC.cloud.signInWithIdToken('apple', r.identityToken, raw);
+    $('#modal').close();
+    await afterSignIn();
+  } catch (e) {
+    if (/CANCELED|Vazgeçildi/.test(String(e?.code || e?.message || e))) return;
+    const m = $('#authMsg'); if (m) m.textContent = friendlyError(e); else toast(friendlyError(e));
+  }
+}
 async function oauthStart(provider) {
   try { const url = await SYNC.cloud.oauthUrl(provider); await api.openUrl(url); toast('Tarayıcıda girişi tamamla, sonra uygulamaya dönülecek'); }
   catch (e) { toast(friendlyError(e)); }

@@ -113,6 +113,11 @@ jobs:
       - run: npm ci
         if: steps.key.outputs.ok == 'true'
 
+      - name: Apple ile giriş yeteneği
+        if: steps.key.outputs.ok == 'true'
+        shell: bash
+        run: bash scripts/asc-capability.sh || echo "::warning::Apple ile giriş yeteneği açılamadı"
+
       - name: Derle ve TestFlight'a yükle
         if: steps.key.outputs.ok == 'true'
         shell: bash

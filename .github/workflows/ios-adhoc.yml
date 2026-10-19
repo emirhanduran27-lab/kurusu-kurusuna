@@ -49,6 +49,10 @@ jobs:
             echo "::notice::Cihaz zaten kayıtlı"
           fi
 
+      - name: Apple ile giriş yeteneği
+        shell: bash
+        run: bash scripts/asc-capability.sh || echo "::warning::Apple ile giriş yeteneği açılamadı"
+
       - run: npm ci
 
       - name: Derle ve Ad Hoc olarak imzala

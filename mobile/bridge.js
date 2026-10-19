@@ -1,6 +1,6 @@
 /* Telefon köprüsü: Capacitor içinde çalışırken masaüstündeki window.api ile aynı arayüzü sağlar.
    Masaüstünde (Electron) hiçbir şey yapmaz. esbuild ile renderer/vendor/mobile-bridge.js olarak paketlenir. */
-import { Capacitor, CapacitorHttp, SystemBars, SystemBarsStyle } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, SystemBars, SystemBarsStyle, registerPlugin } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -148,6 +148,8 @@ if (Capacitor.isNativePlatform()) {
       return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
     },
     scheduleReminders: list => scheduleReminders(list),
+    // Apple ile giriş sadece iPhone'da, uygulamanın kendi yerel parçasıyla (ios/App/App/AppleSignIn.swift)
+    appleSignIn: platform === 'ios' ? (nonce => registerPlugin('AppleSignIn').authorize({ nonce })) : undefined,
     openDataFolder: async () => false,
     info: async () => { const i = await App.getInfo(); return { version: i.version, dataPath: 'Telefonun uygulama hafızası' }; },
     checkUpdate: async () => { checkUpdate(); return true; },

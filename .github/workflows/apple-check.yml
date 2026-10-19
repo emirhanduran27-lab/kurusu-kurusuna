@@ -99,6 +99,10 @@ jobs:
           APPLE_CSC_P12_BASE64=$(base64 < dist.p12 | tr -d '\n') APPLE_CSC_PASSWORD=$PW bash "$GITHUB_WORKSPACE/scripts/ci-mac-keychain.sh" | tail -3
           n "profil: $PNAME ($UUID), sertifika kimliği $CID (Apple sürümü işlerken imza geçerli kalsın diye hemen silinmiyor)"
 
+      - name: Apple ile giriş yeteneği
+        shell: bash
+        run: bash scripts/asc-capability.sh || echo "::warning::Apple ile giriş yeteneği açılamadı"
+
       - name: iPhone derle
         shell: bash
         env:

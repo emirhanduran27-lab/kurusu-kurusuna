@@ -20,6 +20,7 @@ window.KKCloud = {
         const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: REDIRECT } }); err(error);
         return { needsConfirm: !data.session };
       },
+      async signInWithIdToken(provider, token, nonce) { const { error } = await sb.auth.signInWithIdToken({ provider, token, nonce }); err(error); },
       async signIn(email, password) { const { error } = await sb.auth.signInWithPassword({ email, password }); err(error); },
       async signOut() { await sb.auth.signOut({ scope: 'local' }); },
       async resetPassword(email) { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT }); err(error); },
