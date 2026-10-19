@@ -13,6 +13,10 @@ on:
         description: Sadece biri (mac, ios) ya da ikisi (all)
         type: string
         default: all
+      classic:
+        description: iPhone'u bulut imzası yerine klasik dağıtım sertifikasıyla imzala
+        type: boolean
+        default: false
 
 jobs:
   mac:
@@ -62,10 +66,45 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Klasik dağıtım sertifikası ve profili hazırla
+        if: inputs.classic
+        id: classic
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          n() { echo "::notice::$*"; }
+          openssl req -new -newkey rsa:2048 -nodes -keyout dist.key -out dist.csr -subj "/CN=Kurusu CI/O=EMIRHAN DURAN/C=TR" 2>/dev/null
+          CSR=$(grep -v -- '-----' dist.csr | tr -d '\n')
+          A="$GITHUB_WORKSPACE/scripts/asc.js"
+          BID=$(node "$A" GET "/v1/bundleIds?filter%5Bidentifier%5D=com.emirhanduran.kurusukurusuna" | node -pe "JSON.parse(require('fs').readFileSync(0)).data.find(x=>x.attributes.identifier==='com.emirhanduran.kurusukurusuna').id")
+          n "bundle id kaydı: $BID"
+          CERT=$(node "$A" POST /v1/certificates "{\"data\":{\"type\":\"certificates\",\"attributes\":{\"certificateType\":\"DISTRIBUTION\",\"csrContent\":\"$CSR\"}}}") || { echo "::error::Sertifika oluşturulamadı"; exit 1; }
+          CID=$(echo "$CERT" | node -pe "JSON.parse(require('fs').readFileSync(0)).data.id")
+          echo "cert=$CID" >> "$GITHUB_OUTPUT"
+          echo "$CERT" | node -pe "JSON.parse(require('fs').readFileSync(0)).data.attributes.certificateContent" | base64 --decode > dist.cer
+          openssl x509 -inform DER -in dist.cer -out dist.pem
+          n "sertifika: $(openssl x509 -in dist.pem -noout -subject)"
+          PNAME="Kurusu CI $(date -u +%Y%m%d%H%M)"
+          PROF=$(node "$A" POST /v1/profiles "{\"data\":{\"type\":\"profiles\",\"attributes\":{\"name\":\"$PNAME\",\"profileType\":\"IOS_APP_STORE\"},\"relationships\":{\"bundleId\":{\"data\":{\"type\":\"bundleIds\",\"id\":\"$BID\"}},\"certificates\":{\"data\":[{\"type\":\"certificates\",\"id\":\"$CID\"}]}}}}") || { echo "::error::Profil oluşturulamadı"; exit 1; }
+          PID=$(echo "$PROF" | node -pe "JSON.parse(require('fs').readFileSync(0)).data.id")
+          echo "prof=$PID" >> "$GITHUB_OUTPUT"
+          echo "$PROF" | node -pe "JSON.parse(require('fs').readFileSync(0)).data.attributes.profileContent" | base64 --decode > dist.mobileprovision
+          UUID=$(security cms -D -i dist.mobileprovision | plutil -extract UUID raw -)
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp dist.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "pname=$PNAME" >> "$GITHUB_OUTPUT"
+          PW=$(openssl rand -hex 12)
+          openssl pkcs12 -export -legacy -inkey dist.key -in dist.pem -out dist.p12 -passout pass:$PW 2>/dev/null || openssl pkcs12 -export -inkey dist.key -in dist.pem -out dist.p12 -passout pass:$PW
+          APPLE_CSC_P12_BASE64=$(base64 < dist.p12 | tr -d '\n') APPLE_CSC_PASSWORD=$PW bash "$GITHUB_WORKSPACE/scripts/ci-mac-keychain.sh" | tail -3
+          n "profil: $PNAME ($UUID), sertifika kimliği $CID (Apple sürümü işlerken imza geçerli kalsın diye hemen silinmiyor)"
+
       - name: iPhone derle
         shell: bash
         env:
           UPLOAD: ${{ inputs.upload }}
+          CLASSIC: ${{ inputs.classic }}
+          PNAME: ${{ steps.classic.outputs.pname }}
         run: |
           set -o pipefail
           printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
@@ -74,10 +113,15 @@ jobs:
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" -authenticationKeyID "$APPLE_API_KEY_ID" -authenticationKeyIssuerID "$APPLE_API_ISSUER")
           fail() { grep -iE "error|fail|invalid|denied|unable|no profiles|provision|certificate" "$1" | grep -v "^\s*$" | tail -12 | while IFS= read -r l; do echo "::error::${l:0:900}"; done; exit 1; }
           # Arşiv imzasız alınır, App Store imzası dışa aktarırken Apple'ın bulut imzasıyla atılır (cihaz kaydı gerekmez)
+          if [ "$CLASSIC" = "true" ]; then
+            SIGN=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="$PNAME")
+          else
+            SIGN=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="")
+          fi
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD" \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive > "$RUNNER_TEMP/a.log" 2>&1 || fail "$RUNNER_TEMP/a.log"
+            "${SIGN[@]}" archive > "$RUNNER_TEMP/a.log" 2>&1 || fail "$RUNNER_TEMP/a.log"
           echo "::notice::Arşiv tamam"
           DEST=export; [ "$UPLOAD" = "true" ] && DEST=upload
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
@@ -91,6 +135,11 @@ jobs:
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict></plist>
           PLIST
+          if [ "$CLASSIC" = "true" ]; then
+            /usr/libexec/PlistBuddy -c "Set :signingStyle manual" "$RUNNER_TEMP/export.plist"
+            /usr/libexec/PlistBuddy -c "Add :signingCertificate string Apple Distribution" "$RUNNER_TEMP/export.plist"
+            /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" -c "Add :provisioningProfiles:com.emirhanduran.kurusukurusuna string $PNAME" "$RUNNER_TEMP/export.plist"
+          fi
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
             -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" > "$RUNNER_TEMP/e.log" 2>&1 || fail "$RUNNER_TEMP/e.log"
           echo "::notice::Dışa aktarma tamam ($DEST)"
