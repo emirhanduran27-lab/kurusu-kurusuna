@@ -8,12 +8,18 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      only_mac:
+        description: Sadece Mac sürümünü derleyip mevcut sürüm sayfasına ekle
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 jobs:
   windows:
+    if: ${{ !inputs.only_mac }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -39,6 +45,7 @@ jobs:
   mac:
     # Aynı sürüm sayfasını iki iş birden oluşturmaya çalışmasın diye Windows'tan sonra çalışır
     needs: windows
+    if: ${{ always() && (needs.windows.result == 'success' || inputs.only_mac) }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -65,7 +72,10 @@ jobs:
             # electron-builder'ın kendi anahtar zinciri yeni macOS'ta açılamıyor, sertifikayı biz yüklüyoruz
             bash scripts/ci-mac-keychain.sh
             export CSC_NAME="EMIRHAN DURAN (77MQ2KKSS6)" APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
-            npx electron-builder --mac --publish always
+            # Apple onayı uzun sürebiliyor. electron-builder 2 saatten eski sürüm sayfasına yüklemeyi atladığı için dosyaları biz yüklüyoruz
+            npx electron-builder --mac --publish never
+            VERSION=$(node -p "require('./package.json').version")
+            gh release upload "v$VERSION" dist/*.dmg dist/*.dmg.blockmap dist/*.zip dist/*.zip.blockmap dist/latest-mac.yml --clobber
           else
             echo "::warning::Apple imza bilgileri yok, Mac sürümü imzasız derlendi"
             export CSC_IDENTITY_AUTO_DISCOVERY=false
