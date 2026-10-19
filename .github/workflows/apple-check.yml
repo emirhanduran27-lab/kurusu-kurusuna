@@ -32,7 +32,8 @@ jobs:
           set -o pipefail
           echo "p12 uzunluk: ${#APPLE_CSC_P12_BASE64}, p8 satır: $(printf '%s' "$APPLE_API_KEY_P8" | wc -l), key id: ${#APPLE_API_KEY_ID}, issuer: ${#APPLE_API_ISSUER}"
           printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
-          export CSC_LINK="$APPLE_CSC_P12_BASE64" CSC_KEY_PASSWORD="$APPLE_CSC_PASSWORD" APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          bash scripts/ci-mac-keychain.sh 2>&1 | tee "$RUNNER_TEMP/kc.log" || { tail -5 "$RUNNER_TEMP/kc.log" | while IFS= read -r l; do echo "::error::$l"; done; exit 1; }
+          export CSC_NAME="EMIRHAN DURAN (77MQ2KKSS6)" APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
           if ! npx electron-builder --mac --publish never 2>&1 | tee "$RUNNER_TEMP/out.log"; then
             grep -iE "error|⨯|fail|invalid|denied|unable|not |status" "$RUNNER_TEMP/out.log" | tail -12 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
             exit 1
@@ -66,10 +67,11 @@ jobs:
           BUILD=$(date -u +%Y%m%d%H%M)
           AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" -authenticationKeyID "$APPLE_API_KEY_ID" -authenticationKeyIssuerID "$APPLE_API_ISSUER")
           fail() { grep -iE "error|fail|invalid|denied|unable|no profiles|provision|certificate" "$1" | grep -v "^\s*$" | tail -12 | while IFS= read -r l; do echo "::error::${l:0:900}"; done; exit 1; }
+          # Arşiv imzasız alınır, App Store imzası dışa aktarırken Apple'ın bulut imzasıyla atılır (cihaz kaydı gerekmez)
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" \
-            "${AUTH[@]}" archive > "$RUNNER_TEMP/a.log" 2>&1 || fail "$RUNNER_TEMP/a.log"
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" archive > "$RUNNER_TEMP/a.log" 2>&1 || fail "$RUNNER_TEMP/a.log"
           echo "::notice::Arşiv tamam"
           DEST=export; [ "$UPLOAD" = "true" ] && DEST=upload
           cat > "$RUNNER_TEMP/export.plist" <<PLIST
