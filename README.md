@@ -24,6 +24,8 @@ Program Uygulamalar klasöründen çalışmalı. Doğrudan `.dmg` içinden açı
 
 ## Hesap ve eşitleme
 
+Hesap açmak için e-posta ve parola, Google ile giriş ya da iPhone'da Apple ile giriş kullanılabilir.
+
 Ayarlar → Hesap ve eşitleme bölümünden e-posta ya da Google ile hesap açılır. Aynı hesapla giriş yapılan bilgisayar ve telefonlarda veriler aynı olur. Hesap isteğe bağlıdır; açmayan kişi her şeyi sadece kendi cihazında tutmaya devam eder.
 
 - **Uçtan uca şifreleme:** Veriler cihazdan çıkmadan önce AES-256 ile şifrelenir. Anahtar, kullanıcının belirlediği **veri parolası** ile kilitlenir. Sunucuda (Supabase) sadece okunamayan metin durur, uygulamanın sahibi de dahil kimse verileri göremez.
