@@ -1,0 +1,88 @@
+name: Apple denemesi
+
+# Yayın yapmadan Mac imzasını, Apple onayını ve iPhone derlemesini dener.
+# Hata olursa son satırlar iş özetine not (annotation) olarak düşer.
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: iPhone derlemesi TestFlight'a da yüklensin mi
+        type: boolean
+        default: false
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Mac imzala ve onaylat
+        shell: bash
+        env:
+          APPLE_CSC_P12_BASE64: ${{ secrets.APPLE_CSC_P12_BASE64 }}
+          APPLE_CSC_PASSWORD: ${{ secrets.APPLE_CSC_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -o pipefail
+          echo "p12 uzunluk: ${#APPLE_CSC_P12_BASE64}, p8 satır: $(printf '%s' "$APPLE_API_KEY_P8" | wc -l), key id: ${#APPLE_API_KEY_ID}, issuer: ${#APPLE_API_ISSUER}"
+          printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          export CSC_LINK="$APPLE_CSC_P12_BASE64" CSC_KEY_PASSWORD="$APPLE_CSC_PASSWORD" APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+          if ! npx electron-builder --mac --publish never 2>&1 | tee "$RUNNER_TEMP/out.log"; then
+            grep -iE "error|⨯|fail|invalid|denied|unable|not |status" "$RUNNER_TEMP/out.log" | tail -12 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+            exit 1
+          fi
+          APP=$(ls -d dist/mac-universal/*.app | head -1)
+          codesign --verify --deep --strict --verbose=2 "$APP" 2>&1 | tail -3
+          spctl --assess --type execute --verbose "$APP" 2>&1 | while IFS= read -r l; do echo "::notice::$l"; done
+
+  ios:
+    runs-on: macos-latest
+    env:
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: iPhone derle
+        shell: bash
+        env:
+          UPLOAD: ${{ inputs.upload }}
+        run: |
+          set -o pipefail
+          printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          npx cap sync ios
+          BUILD=$(date -u +%Y%m%d%H%M)
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" -authenticationKeyID "$APPLE_API_KEY_ID" -authenticationKeyIssuerID "$APPLE_API_ISSUER")
+          fail() { grep -iE "error|fail|invalid|denied|unable|no profiles|provision|certificate" "$1" | grep -v "^\s*$" | tail -12 | while IFS= read -r l; do echo "::error::${l:0:900}"; done; exit 1; }
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" \
+            "${AUTH[@]}" archive > "$RUNNER_TEMP/a.log" 2>&1 || fail "$RUNNER_TEMP/a.log"
+          echo "::notice::Arşiv tamam"
+          DEST=export; [ "$UPLOAD" = "true" ] && DEST=upload
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>$DEST</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" > "$RUNNER_TEMP/e.log" 2>&1 || fail "$RUNNER_TEMP/e.log"
+          echo "::notice::Dışa aktarma tamam ($DEST)"
