@@ -57,7 +57,7 @@ function toRecords(d) {
   d.accounts.forEach((x, i) => put('acc', x.id, { ...x, _o: i }));
   for (const t of ['income', 'expense']) d.categories[t].forEach((c, i) => put('cat', c.id, { ...c, _t: t, _o: i }));
   put('meta', 'budgets', d.budgets);
-  put('meta', 'prefs', { currency: d.settings.currency, reminderDays: d.settings.reminderDays, importProfiles: d.settings.importProfiles || {} });
+  put('meta', 'prefs', { currency: d.settings.currency, reminderDays: d.settings.reminderDays, reminderHour: d.settings.reminderHour, importProfiles: d.settings.importProfiles || {} });
   return r;
 }
 function applyRecords(d, r) {
@@ -74,7 +74,7 @@ function applyRecords(d, r) {
   if (exp.length) d.categories.expense = exp;
   d.budgets = r['meta:budgets'] || {};
   const p = r['meta:prefs'];
-  if (p) { d.settings.currency = p.currency || d.settings.currency; d.settings.reminderDays = p.reminderDays || d.settings.reminderDays; if (p.importProfiles && typeof p.importProfiles === 'object') d.settings.importProfiles = p.importProfiles; }
+  if (p) { d.settings.currency = p.currency || d.settings.currency; d.settings.reminderDays = p.reminderDays || d.settings.reminderDays; if (p.reminderHour >= 0 && p.reminderHour <= 23) d.settings.reminderHour = p.reminderHour; if (p.importProfiles && typeof p.importProfiles === 'object') d.settings.importProfiles = p.importProfiles; }
 }
 
 /* ---------- Eşitleme motoru ---------- */

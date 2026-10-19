@@ -71,7 +71,7 @@ function defaultData() {
   const mk = (names, prefix) => names.map((n, i) => ({ id: prefix + (i + 1), name: n, color: PALETTE[(i + (prefix === 'e' ? 3 : 0)) % PALETTE.length] }));
   return {
     version: 1,
-    settings: { currency: 'TRY', theme: 'dark', reminderDays: 3, lastNotified: '', lock: null, hideAmounts: false },
+    settings: { currency: 'TRY', theme: 'dark', reminderDays: 3, reminderHour: 10, lastNotified: '', lock: null, hideAmounts: false },
     categories: {
       income: mk(['Maaş', 'Burs', 'Ek Gelir / Serbest', 'Kira Geliri', 'Yatırım Getirisi', 'Hediye', 'Diğer Gelir'], 'i'),
       expense: mk(['Kira', 'Market', 'Faturalar', 'Ulaşım', 'Yeme İçme', 'Sağlık', 'Eğitim', 'Giyim', 'Eğlence', 'Abonelikler', 'Kredi / Taksit', 'Kişisel Bakım', 'Teknoloji', 'Ev Eşyası', 'Diğer Gider'], 'e')
@@ -175,17 +175,18 @@ function persist() {
 function upcomingReminders() {
   const s = S.data.settings, out = [];
   const at = (dateStr, hour) => { const d = parseDate(dateStr); d.setHours(hour, 0, 0, 0); return d; };
+  const h = s.reminderHour >= 0 && s.reminderHour <= 23 ? s.reminderHour : 10;
   S.data.recurring.filter(r => r.active !== false && r.nextDate && r.type !== 'income' && daysUntil(r.nextDate) <= 60).forEach(r => {
     const before = parseDate(r.nextDate); before.setDate(before.getDate() - (s.reminderDays || 3));
     const amount = s.hideAmounts || s.lock ? '' : ` (${money(r.amount)})`;
-    out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${r.name}${amount} ${fmtDate(r.nextDate)} tarihinde.` });
-    out.push({ at: at(r.nextDate, 10).getTime(), title: 'Bugün ödeme günü', body: `${r.name}${amount} bugün ödenecek.` });
+    out.push({ name: r.name, at: at(ymd(before), h).getTime(), title: 'Yaklaşan ödeme', body: `${r.name}${amount} ${fmtDate(r.nextDate)} tarihinde.` });
+    out.push({ name: r.name, at: at(r.nextDate, h).getTime(), title: 'Bugün ödeme günü', body: `${r.name}${amount} bugün ödenecek.` });
   });
   extraDueItems().forEach(x => {
     const amount = s.hideAmounts || s.lock ? '' : ` (${money(x.amount)})`;
     const before = parseDate(x.date); before.setDate(before.getDate() - (s.reminderDays || 3));
-    out.push({ at: at(ymd(before), 10).getTime(), title: 'Yaklaşan ödeme', body: `${x.name}${amount} ${fmtDate(x.date)} tarihinde.` });
-    out.push({ at: at(x.date, 10).getTime(), title: 'Bugün son ödeme günü', body: `${x.name}${amount} bugün.` });
+    out.push({ name: x.name, at: at(ymd(before), h).getTime(), title: 'Yaklaşan ödeme', body: `${x.name}${amount} ${fmtDate(x.date)} tarihinde.` });
+    out.push({ name: x.name, at: at(x.date, h).getTime(), title: 'Bugün son ödeme günü', body: `${x.name}${amount} bugün.` });
   });
   return out.filter(n => n.at > Date.now()).sort((a, b) => a.at - b.at).slice(0, 60);
 }
@@ -738,6 +739,10 @@ VIEWS.ayarlar = () => {
         <select class="input" id="sCur">${['TRY', 'USD', 'EUR', 'GBP'].map(c => `<option ${s.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
       <div class="set-row"><div class="main-col"><b>Hatırlatma</b><div class="muted">Düzenli ödemeden kaç gün önce bildirim gelsin</div></div>
         <select class="input" id="sRem">${[1, 2, 3, 5, 7].map(n => `<option value="${n}" ${s.reminderDays === n ? 'selected' : ''}>${n} gün önce</option>`).join('')}</select></div>
+      <div class="set-row"><div class="main-col"><b>Bildirim saati</b><div class="muted">Hatırlatmalar günün bu saatinde gelir</div></div>
+        <select class="input" id="sHour">${Array.from({ length: 17 }, (_, i) => i + 6).map(n => `<option value="${n}" ${(s.reminderHour ?? 10) === n ? 'selected' : ''}>${pad(n)}:00</option>`).join('')}</select></div>
+      <div class="set-row"><div class="main-col"><b>Bildirimler</b><div class="muted" id="nextRem">${nextReminderText()}</div></div>
+        <button class="btn" data-action="test-notify">Bildirimi dene</button></div>
     </div>
     <div class="card">
       <h2>Veriler</h2>
@@ -774,6 +779,7 @@ AFTER.ayarlar = () => {
   $('#sTheme').addEventListener('change', e => { S.data.settings.theme = e.target.value; commit(); });
   $('#sCur').addEventListener('change', e => { S.data.settings.currency = e.target.value; commit(); });
   $('#sRem').addEventListener('change', e => { S.data.settings.reminderDays = Number(e.target.value); commit(); });
+  $('#sHour').addEventListener('change', e => { S.data.settings.reminderHour = Number(e.target.value); commit(); });
   $('#sHide').addEventListener('change', () => toggleHide());
   $('#sBudgetAlert').addEventListener('change', e => { S.data.settings.budgetAlerts = e.target.checked; persist(); });
   $$('[data-color-cat]').forEach(inp => inp.addEventListener('change', () => {
@@ -1422,6 +1428,7 @@ document.addEventListener('click', async e => {
       d.assets = d.assets.filter(x => !x.sample);
       d.templates = d.templates.filter(x => !x.sample);
       commit(); return toast('Örnek veriler silindi');
+    case 'test-notify': return testNotify();
     case 'wipe':
       return openModal({
         title: 'Tüm verileri sil', submit: 'Her şeyi sil', danger: true,
@@ -1451,6 +1458,20 @@ document.addEventListener('keydown', e => {
   else if (k === 'n') { e.preventDefault(); txForm(null, 'expense'); }
   else if (k === 'h') { e.preventDefault(); toggleHide(); }
 });
+
+function nextReminderText() {
+  const n = upcomingReminders()[0];
+  if (!n) return 'Planlanmış hatırlatma yok';
+  const d = new Date(n.at);
+  return `Sıradaki: ${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })} ${pad(d.getHours())}:00 · ${esc(n.name)}`;
+}
+async function testNotify() {
+  const fn = api.alert || api.notify;
+  try {
+    const ok = await fn('Kuruşu Kuruşuna', 'Bildirimler çalışıyor 👍');
+    toast(ok === false ? 'Bildirim izni yok. Telefonun ayarlarından bu uygulamaya bildirim izni ver.' : 'Deneme bildirimi gönderildi');
+  } catch { toast('Bildirim gönderilemedi'); }
+}
 
 /* ---------- Başlangıç ---------- */
 function startupReminder() {

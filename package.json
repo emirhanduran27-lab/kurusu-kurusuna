@@ -1,7 +1,7 @@
 {
   "name": "kurusu-kurusuna",
   "productName": "Kuruşu Kuruşuna",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Gelir, gider, düzenli ödeme, bütçe ve birikim takibi",
   "main": "main.js",
   "author": "Emirhan Duran",
