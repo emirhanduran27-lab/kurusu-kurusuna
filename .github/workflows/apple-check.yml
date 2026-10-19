@@ -9,9 +9,14 @@ on:
         description: iPhone derlemesi TestFlight'a da yüklensin mi
         type: boolean
         default: false
+      only:
+        description: Sadece biri (mac, ios) ya da ikisi (all)
+        type: string
+        default: all
 
 jobs:
   mac:
+    if: inputs.only != 'ios'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -43,6 +48,7 @@ jobs:
           spctl --assess --type execute --verbose "$APP" 2>&1 | while IFS= read -r l; do echo "::notice::$l"; done
 
   ios:
+    if: inputs.only != 'mac'
     runs-on: macos-latest
     env:
       APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
@@ -88,3 +94,15 @@ jobs:
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
             -exportPath "$RUNNER_TEMP/export" "${AUTH[@]}" > "$RUNNER_TEMP/e.log" 2>&1 || fail "$RUNNER_TEMP/e.log"
           echo "::notice::Dışa aktarma tamam ($DEST)"
+          if [ "$DEST" = export ]; then
+            # Paketin imzalarını incele
+            cd "$RUNNER_TEMP/export"; ls; mkdir x; cd x; unzip -q ../*.ipa
+            APP=$(ls -d Payload/*.app)
+            n() { echo "::notice::$*"; }
+            n "app: $(codesign -dv "$APP" 2>&1 | grep -E 'Authority=|TeamIdentifier' | tr '\n' ' ')"
+            n "verify: $(codesign --verify --deep --strict "$APP" 2>&1 | tail -2 | tr '\n' ' ') rc=$?"
+            n "ent: $(codesign -d --entitlements - --xml "$APP" 2>/dev/null | tr -d '\n\t' | head -c 700)"
+            security cms -D -i "$APP/embedded.mobileprovision" > prof.plist 2>/dev/null && n "profil: $(/usr/libexec/PlistBuddy -c 'Print :Name' prof.plist) / ProvisionsAllDevices=$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' prof.plist 2>&1) / $(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' prof.plist)"
+            for f in "$APP"/Frameworks/*; do n "fw $(basename "$f"): $(codesign -dv "$f" 2>&1 | grep -E 'Authority=Apple Distribution|TeamIdentifier|not signed' | head -2 | tr '\n' ' ')"; done
+            n "plist: $(/usr/libexec/PlistBuddy -c 'Print :UIRequiredDeviceCapabilities' "$APP/Info.plist" | tr -d '\n ') min=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist") exe=$(lipo -info "$APP/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")" | sed 's/.*: //')"
+          fi
