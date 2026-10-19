@@ -62,8 +62,9 @@ jobs:
           if [ -n "$APPLE_CSC_P12_BASE64" ] && [ -n "$APPLE_API_KEY_P8" ]; then
             # Developer ID ile imzala ve Apple'a onaylat (notarization)
             printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
-            export CSC_LINK="$APPLE_CSC_P12_BASE64" CSC_KEY_PASSWORD="$APPLE_CSC_PASSWORD"
-            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
+            # electron-builder'ın kendi anahtar zinciri yeni macOS'ta açılamıyor, sertifikayı biz yüklüyoruz
+            bash scripts/ci-mac-keychain.sh
+            export CSC_NAME="EMIRHAN DURAN (77MQ2KKSS6)" APPLE_API_KEY="$RUNNER_TEMP/AuthKey.p8"
             npx electron-builder --mac --publish always
           else
             echo "::warning::Apple imza bilgileri yok, Mac sürümü imzasız derlendi"
