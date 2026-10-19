@@ -102,7 +102,7 @@ jobs:
             </dict>
           </dict></array></dict></plist>
           PLIST
-          sed -i '' "s/{{SURUM}}/$VERSION ($BUILD)/" docs/test/index.html
+          sed -i '' -E "s/iPhone test sürümü [^<]*/iPhone test sürümü $VERSION ($BUILD)/" docs/test/index.html
           git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/test
           git commit -m "iPhone test sürümü $VERSION ($BUILD)"
