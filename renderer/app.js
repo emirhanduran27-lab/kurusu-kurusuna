@@ -768,6 +768,8 @@ VIEWS.ayarlar = () => {
   <div class="card mt"><h2>Hesaplar<span class="spacer"></span><button class="btn btn-sm" data-goto="hesaplar">Hesapları yönet</button></h2>
     <div class="chips">${d.accounts.filter(a => !a.archived).map(a => `<span class="chip" style="padding-right:10px"><span class="dot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div></div>
   <div class="card mt"><h2>Güncellemeler</h2>
+    <div class="set-row"><div class="main-col"><b>Öneri ve sorun bildir</b><div class="muted">Bir fikrin mi var, bir şey mi bozuk? Doğrudan bana ulaşır.</div></div>
+      <button class="btn" data-action="feedback" data-kind="sorun">Sorun bildir</button><button class="btn" data-action="feedback">Öneri gönder</button></div>
     <div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
       <button class="btn" data-action="open-repo">GitHub sayfası</button>
       <span id="updBtnWrap">${updateButton()}</span></div>

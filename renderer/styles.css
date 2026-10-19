@@ -521,3 +521,10 @@ dialog.xl { width: min(980px, 96vw); }
   .imp-amt { grid-area: a; }
 }
 .ins b.money { font-weight: 600; }
+
+/* Geri bildirim */
+.seg.seg3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.4; }
+label.check input { margin-top: 2px; accent-color: var(--saving); }
+.seg3 input:checked + label { background: var(--saving); color: #fff; }
+#fbMsg a { color: var(--saving); font-weight: 600; }

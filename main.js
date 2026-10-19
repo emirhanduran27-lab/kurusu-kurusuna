@@ -380,7 +380,7 @@ if (!gotLock) {
     ipcMain.handle('bio:prompt', async (_e, reason) => {
       try { await systemPreferences.promptTouchID(String(reason || 'Kilidi aç')); return true; } catch { return false; }
     });
-    ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) shell.openExternal(url); });
+    ipcMain.handle('open:url', (_e, url) => { if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url) || /^mailto:emirhanduran27@gmail\.com\?/.test(url)) shell.openExternal(url); });
     ipcMain.handle('http:get', async (_e, url) => {
       if (!/^https:\/\/(api\.frankfurter\.dev|api\.gold-api\.com)\//.test(url)) throw new Error('izin yok');
       const r = await fetch(url, { headers: { Accept: 'application/json' } });

@@ -50,6 +50,8 @@ window.KKCloud = {
         return data || [];
       },
       async push(rows) { if (!rows.length) return; const { error } = await sb.from('records').upsert(rows, { onConflict: 'user_id,id' }); err(error); },
+      // Geri bildirim: tablo sadece eklemeye açık, okunamaz. Bu yüzden eklenen satır geri istenmez.
+      async sendFeedback(row) { const { error } = await sb.from('feedback').insert(row); err(error); },
       async deleteAccount() { const { error } = await sb.rpc('delete_my_account'); err(error); await sb.auth.signOut({ scope: 'local' }); }
     };
   }

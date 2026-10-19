@@ -488,6 +488,7 @@ function moreMenu() {
       ${item('borclar', '⇆', 'Borç ve Alacak', 'Kime ne borçlusun, kim sana borçlu')}
       ${item('butce', '▤', 'Bütçe ve Raporlar', 'Limitler, grafikler, yıllık özet')}
       ${item('ayarlar', '⚙', 'Ayarlar', 'Güvenlik, yedek, kategoriler')}
+      <button type="button" class="more-item" data-action="feedback"><span>💬</span><div><b>Öneri ve sorun bildir</b><small>Fikrini ya da yaşadığın sorunu yaz</small></div></button>
     </div>`
   });
 }
