@@ -155,7 +155,7 @@ if (Capacitor.isNativePlatform()) {
     checkUpdate: async () => { checkUpdate(); return true; },
     updateState: async () => updateState,
     installUpdate: async () => { if (updateState.url) await Browser.open({ url: updateState.url }); },
-    openUrl: async url => { if (/^mailto:emirhanduran27@gmail\.com\?/.test(url)) { window.location.href = url; return; } if (/^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) await Browser.open({ url }); },
+    openUrl: async url => { if (/^mailto:emirhanduran27@gmail\.com\?/.test(url)) { window.location.href = url; return; } if (url === 'https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html' || /^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) await Browser.open({ url }); },
     onDeepLink: cb => {
       App.addListener('appUrlOpen', ({ url }) => { if (url && url.startsWith('kurusukurusuna://')) { Browser.close().catch(() => {}); cb(url); } });
       App.getLaunchUrl().then(r => { if (r?.url?.startsWith('kurusukurusuna://')) cb(r.url); }).catch(() => {});

@@ -2,7 +2,7 @@
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gizlilik Politikası</title><link rel="icon" href="icon.png"><link rel="stylesheet" href="stil.css"></head>
 <body><main>
-<header><img src="icon.png" alt=""><div><h1>Gizlilik Politikası</h1><span class="mute">Kuruşu Kuruşuna · Son güncelleme 18 Ekim 2026</span></div></header>
+<header><img src="icon.png" alt=""><div><h1>Gizlilik Politikası</h1><span class="mute">Kuruşu Kuruşuna · Son güncelleme 23 Ekim 2026</span></div></header>
 <p>Bu sayfa Kuruşu Kuruşuna uygulamasının hangi bilgileri nasıl kullandığını anlatır. Kısacası finansal kayıtlarını biz göremeyiz, reklam ya da analiz aracı kullanmayız ve hiçbir bilgiyi satmayız.</p>
 
 <h2>Cihazında tutulan veriler</h2>
@@ -11,7 +11,7 @@
 <h2>Hesap ve eşitleme (isteğe bağlı)</h2>
 <p>Telefonla bilgisayarı eşitlemek için hesap açabilirsin. Hesap altyapısı ve veritabanı için Supabase hizmeti kullanılır. Bu durumda şunlar sunucuda tutulur.</p>
 <ul>
-<li><b>E-posta adresin</b> ve giriş için gereken bilgiler. Google ile girersen Google'dan yalnızca e-posta adresin ve adın alınır.</li>
+<li><b>E-posta adresin</b> ve giriş için gereken bilgiler. Google ile girersen Google'dan e-posta adresin ve adın alınabilir. Apple ile girişte Apple'ın sağladığı e-posta adresi (gizli e-posta seçildiğinde yönlendirme adresi) ve kimlik doğrulama bilgileri kullanılır.</li>
 <li><b>Şifrelenmiş kayıtların.</b> Her kayıt sunucuya gönderilmeden önce cihazında AES-256 ile şifrelenir. Şifreyi çözen anahtar senin belirlediğin veri parolasından ve kurtarma anahtarından türetilir ve bunlar sunucuya gönderilmez. Bu yüzden ne biz ne de Supabase kayıtlarının içeriğini okuyabilir.</li>
 <li>Kayıtların ne zaman değiştiği gibi eşitleme için gereken teknik bilgiler.</li>
 </ul>
@@ -19,13 +19,16 @@
 
 <h2>İnternete yapılan diğer bağlantılar</h2>
 <ul>
-<li><b>Güncelleme kontrolü.</b> Uygulama yeni sürüm olup olmadığını GitHub üzerinden kontrol eder.</li>
+<li><b>Güncelleme kontrolü.</b> Masaüstü ve Android sürümleri yeni sürüm olup olmadığını GitHub üzerinden kontrol eder. iOS güncellemeleri App Store üzerinden sağlanır.</li>
 <li><b>Döviz ve altın kurları.</b> Kurlar frankfurter.dev ve gold-api.com adreslerinden alınır. Bu isteklerde hiçbir kişisel bilgin gönderilmez.</li>
 </ul>
 <p>Bu hizmetler bağlantı sırasında IP adresini kendi kuralları çerçevesinde görebilir.</p>
 
-<h2>Verilerini silme</h2>
-<p>Ayarlar sayfasındaki hesap menüsünden "Hesabı sil" seçeneğiyle hesabını ve sunucudaki bütün kayıtlarını kalıcı olarak silebilirsin. Cihazındaki verileri silmek için uygulamayı kaldırman ya da veri klasörünü silmen yeterlidir.</p>
+<h2>Öneri ve sorun bildirimleri</h2>
+<p>Bir geri bildirim gönderdiğinde mesajın, seçtiğin bildirim türü ve isteğe bağlı iletişim adresin destek talebini yanıtlamak ve uygulamayı geliştirmek için Supabase'de saklanır. "Uygulama sürümü ve cihaz bilgisi eklensin" seçeneği açıksa sürüm ve işletim sistemi bilgisi de eklenir. Giriş yaptıysan bildirimin hesap kimliğinle ilişkilendirilebilir. Finansal kayıtların bu forma otomatik olarak eklenmez. Mesajına paylaşmak istemediğin hassas bilgileri yazma.</p>
+<h2>Saklama ve silme</h2>
+<p>Hesap bilgileri ve şifrelenmiş finansal kayıtlar hesabın açık olduğu sürece saklanır. Geri bildirimler destek ve hata takibi amacıyla saklanır; silinmesini aşağıdaki iletişim adresinden isteyebilirsin. Kimliğini doğrulamak ve ilgili bildirimi bulmak için gerekli bilgiler istenebilir. Hesapsız gönderilen bildirimler daha sonra açılan bir hesaba otomatik olarak bağlanmaz.</p>
+<p>Ayarlar → Hesap → "Hesabımı sil" ile hesabını ve eşitlenen finansal kayıtlarını silebilirsin. Geri bildirimlerinin de silinmesini istiyorsan iletişim adresimize yazabilirsin. Hesabı silmek cihazındaki kayıtları veya kendin dışa aktardığın yedekleri silmez. iOS'ta yerel kayıtları kaldırmak için uygulamayı sil ("Uygulamayı kaldır/Offload" işlemi verileri koruyabilir); diğer cihazlarda uygulama verilerini ve yedeklerini ayrıca sil. Hesaptan çıkış yaparak o cihazdaki eşitlemeyi durdurabilirsin.</p>
 
 <h2>Çocuklar</h2>
 <p>Uygulama 13 yaşından küçük çocuklara yönelik değildir ve bilerek onlardan bilgi toplamaz.</p>

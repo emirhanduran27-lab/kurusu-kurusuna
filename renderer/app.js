@@ -756,6 +756,7 @@ VIEWS.ayarlar = () => {
     </div>
   </div>
   <div class="card mt"><h2>Güvenlik ve gizlilik</h2>
+    <div class="set-row"><div class="main-col"><b>Gizlilik politikası</b><div class="muted">Verilerinin nasıl işlendiğini ve silindiğini öğren.</div></div><button class="btn" data-action="open-privacy">Politikayı aç</button></div>
     <div class="set-row"><div class="main-col"><b>Uygulama kilidi</b><div class="muted">${s.lock ? (s.lock.type === 'pin' ? 'Açık, PIN ile' : 'Açık, parola ile') + (s.lock.bio && SEC.bio ? `, ${esc(SEC.bio)} de kullanılabilir` : '') : 'Kapalı. İstersen program açılırken PIN ya da parola sorulur.'}</div></div>
       ${s.lock ? '<button class="btn" data-action="lock-change">Değiştir</button><button class="btn" data-action="lock-remove">Kaldır</button>' : '<button class="btn btn-primary" data-action="lock-setup">Kilit kur</button>'}</div>
     <div class="set-row"><div class="main-col"><b>Tutarları gizle</b><div class="muted">Yanında biri varken tüm rakamları bulanıklaştırır. Kısayol H ya da göz simgesi.</div></div>
@@ -1415,6 +1416,7 @@ document.addEventListener('click', async e => {
     }
     case 'open-folder': return api.openDataFolder();
     case 'open-repo': return api.openUrl(REPO_URL);
+    case 'open-privacy': return api.openUrl('https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html');
     case 'check-update': S.update = { status: 'checking' }; refreshUpdateUI(); return api.checkUpdate();
     case 'install-update':
       if (S.update.status === 'downloading') return toast('Güncelleme hâlâ iniyor, bitince kurabilirsin');

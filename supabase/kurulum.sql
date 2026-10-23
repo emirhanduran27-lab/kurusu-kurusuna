@@ -55,6 +55,7 @@ create policy "kayit sahibi" on public.records for all to authenticated
 create or replace function public.delete_my_account() returns void
 language plpgsql security definer set search_path = '' as $$
 begin
+  delete from public.feedback where user_id = auth.uid();
   delete from auth.users where id = auth.uid();
 end $$;
 revoke all on function public.delete_my_account() from public, anon;

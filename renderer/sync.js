@@ -221,7 +221,7 @@ function syncCardHtml() {
   const st = syncState();
   const btns = !SYNC.cloud ? '<span class="muted">Bulut bağlantısı yüklenemedi.</span>'
     : st?.key ? `<button class="btn" data-action="sync-now">Şimdi eşitle</button><button class="btn" data-action="acct-menu">Hesap</button>`
-    : SYNC.user ? `<button class="btn btn-primary" data-action="sync-unlock">Veri parolasını gir</button><button class="btn" data-action="sync-signout">Çıkış</button>`
+    : SYNC.user ? `<button class="btn btn-primary" data-action="sync-unlock">Veri parolasını gir</button><button class="btn" data-action="acct-menu">Hesap</button><button class="btn" data-action="sync-signout">Çıkış</button>`
     : `<button class="btn btn-primary" data-action="sync-login">Giriş yap</button><button class="btn" data-action="sync-signup">Hesap aç</button>`;
   return `<div class="card"><h2>Hesap ve eşitleme</h2>
     <div class="set-row"><div class="main-col"><b>${st?.email || SYNC.user?.email ? esc(st?.email || SYNC.user.email) : 'Hesap yok'}</b><div class="muted" id="syncStatus">${syncSummary()}</div></div>${btns}</div>
@@ -399,9 +399,9 @@ function newPassphraseForm(vault, dek, thenStart) {
 function accountMenu() {
   const st = syncState();
   openModal({
-    title: st.email, noFoot: true,
+    title: st?.email || SYNC.user?.email || 'Hesap', noFoot: true,
     body: `<div class="more-list">
-      <button type="button" class="more-item" data-action="sync-change-pass"><span>🔑</span><div><b>Veri parolasını değiştir</b><small>Kurtarma anahtarın aynı kalır</small></div></button>
+      ${st?.key ? '<button type="button" class="more-item" data-action="sync-change-pass"><span>🔑</span><div><b>Veri parolasını değiştir</b><small>Kurtarma anahtarın aynı kalır</small></div></button>' : ''}
       <button type="button" class="more-item" data-action="sync-signout"><span>⇥</span><div><b>Çıkış yap</b><small>Bu cihazdaki veriler kalır, eşitleme durur</small></div></button>
       <button type="button" class="more-item danger-item" data-action="sync-delete"><span>🗑</span><div><b>Hesabımı sil</b><small>Buluttaki tüm verilerin silinir, cihazdakiler kalır</small></div></button>
     </div>`
