@@ -10,7 +10,6 @@ import { BiometricAuth, BiometryType } from '@aparajita/capacitor-biometric-auth
 
 if (Capacitor.isNativePlatform()) {
   const FILE = 'veri.json';
-  const REPO = 'emirhanduran27-lab/kurusu-kurusuna';
   const platform = Capacitor.getPlatform(); // 'android' | 'ios'
   const pad = n => String(n).padStart(2, '0');
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -91,11 +90,12 @@ if (Capacitor.isNativePlatform()) {
     for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0); }
     return 0;
   };
-  async function checkUpdate() {
+  // iPhone paketinde güncelleme denetimi hiç yer almaz (__KK_IOS__ derlemede sabitlenir, ölü kod atılır)
+  const checkUpdate = __KK_IOS__ ? async () => send({ status: 'store' }) : async function () {
     if (platform !== 'android') return send({ status: 'store' });
     send({ status: 'checking' });
     try {
-      const [{ version }, res] = await Promise.all([App.getInfo(), fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })]);
+      const [{ version }, res] = await Promise.all([App.getInfo(), fetch('https://api.github.com/repos/emirhanduran27-lab/kurusu-kurusuna/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })]);
       if (!res.ok) throw new Error(res.status);
       const rel = await res.json();
       const latest = String(rel.tag_name || '').replace(/^v/, '');
@@ -103,7 +103,7 @@ if (Capacitor.isNativePlatform()) {
       if (apk && latest && cmpVer(latest, version) > 0) send({ status: 'manual', version: latest, url: apk.browser_download_url, note: 'İndirip açman yeterli, verilerin korunur.' });
       else send({ status: 'latest' });
     } catch { send({ status: 'error' }); }
-  }
+  };
 
   const bioLabel = t => ({
     [BiometryType.touchId]: 'Touch ID', [BiometryType.faceId]: 'Face ID',
@@ -154,8 +154,8 @@ if (Capacitor.isNativePlatform()) {
     info: async () => { const i = await App.getInfo(); return { version: i.version, dataPath: 'Telefonun uygulama hafızası' }; },
     checkUpdate: async () => { checkUpdate(); return true; },
     updateState: async () => updateState,
-    installUpdate: async () => { if (updateState.url) await Browser.open({ url: updateState.url }); },
-    openUrl: async url => { if (/^mailto:emirhanduran27@gmail\.com\?/.test(url)) { window.location.href = url; return; } if (url === 'https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html' || /^https:\/\/(github\.com|hfeptlxxphvccfjrtmkv\.supabase\.co)\//.test(url)) await Browser.open({ url }); },
+    installUpdate: async () => { if (!__KK_IOS__ && updateState.url) await Browser.open({ url: updateState.url }); },
+    openUrl: async url => { if (/^mailto:emirhanduran27@gmail\.com\?/.test(url)) { window.location.href = url; return; } if (url === 'https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html' || /^https:\/\/hfeptlxxphvccfjrtmkv\.supabase\.co\//.test(url) || (!__KK_IOS__ && /^https:\/\/github\.com\//.test(url))) await Browser.open({ url }); },
     onDeepLink: cb => {
       App.addListener('appUrlOpen', ({ url }) => { if (url && url.startsWith('kurusukurusuna://')) { Browser.close().catch(() => {}); cb(url); } });
       App.getLaunchUrl().then(r => { if (r?.url?.startsWith('kurusukurusuna://')) cb(r.url); }).catch(() => {});
@@ -195,7 +195,7 @@ if (Capacitor.isNativePlatform()) {
     const ev = new CustomEvent('kk-back', { cancelable: true });
     if (window.dispatchEvent(ev)) App.exitApp();
   });
-  if (platform === 'android') {
+  if (!__KK_IOS__ && platform === 'android') {
     setTimeout(checkUpdate, 5000);
     setInterval(checkUpdate, 6 * 60 * 60 * 1000);
   }

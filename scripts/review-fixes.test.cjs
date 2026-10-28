@@ -35,12 +35,16 @@ test('Signed-out account card offers sign-in rather than account controls', () =
 test('Mobile URL opener allows the privacy page and blocks lookalike URLs', async () => {
   const bridge = fs.readFileSync('mobile/bridge.js', 'utf8');
   const method = bridge.match(/openUrl: (async url => .*),\r?\n/)[1];
-  const opened = [];
-  const ctx = vm.createContext({ Browser: { open: async ({url}) => opened.push(url) } });
-  const open = vm.runInContext('(' + method + ')', ctx);
   const url = 'https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html';
-  await open(url);
-  await open(url + '/unexpected');
-  await open('https://emirhanduran27-lab.github.io.evil.example/kurusu-kurusuna/gizlilik.html');
-  assert.deepEqual(opened, [url]);
+  for (const ios of [true, false]) {
+    const opened = [];
+    const ctx = vm.createContext({ __KK_IOS__: ios, Browser: { open: async ({url}) => opened.push(url) } });
+    const open = vm.runInContext('(' + method + ')', ctx);
+    await open(url);
+    await open(url + '/unexpected');
+    await open('https://emirhanduran27-lab.github.io.evil.example/kurusu-kurusuna/gizlilik.html');
+    await open('https://github.com/emirhanduran27-lab/kurusu-kurusuna');
+    // iPhone paketi GitHub'ı hiç açmaz, Android açabilir
+    assert.deepEqual(opened, ios ? [url] : [url, 'https://github.com/emirhanduran27-lab/kurusu-kurusuna']);
+  }
 });

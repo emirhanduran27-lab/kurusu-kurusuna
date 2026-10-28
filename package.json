@@ -1,7 +1,7 @@
 {
   "name": "kurusu-kurusuna",
   "productName": "Kuruşu Kuruşuna",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Gelir, gider, düzenli ödeme, bütçe ve birikim takibi",
   "main": "main.js",
   "author": "Emirhan Duran",
@@ -16,9 +16,9 @@
     "dist": "electron-builder --win nsis --publish never",
     "release": "electron-builder --win nsis --publish always",
     "dist:mac": "electron-builder --mac --publish never",
-    "bridge": "esbuild mobile/bridge.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/mobile-bridge.js && esbuild mobile/cloud.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/cloud.js && esbuild mobile/sheet.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/sheet.js && esbuild mobile/pdf.js --bundle --format=iife --minify --target=es2020 --loader:.ttf=binary --outfile=renderer/vendor/pdf.js",
-    "mobile:sync": "npm run bridge && node scripts/sync-ios-version.js && cap sync",
-    "android": "npm run mobile:sync && cd android && ./gradlew assembleRelease"
+    "bridge": "esbuild mobile/bridge.js --bundle --format=iife --minify --target=es2020 --define:__KK_IOS__=false --outfile=renderer/vendor/mobile-bridge.js && esbuild mobile/cloud.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/cloud.js && esbuild mobile/sheet.js --bundle --format=iife --minify --target=es2020 --outfile=renderer/vendor/sheet.js && esbuild mobile/pdf.js --bundle --format=iife --minify --target=es2020 --loader:.ttf=binary --outfile=renderer/vendor/pdf.js",
+    "mobile:sync": "node scripts/mobile-sync.js",
+    "android": "node scripts/mobile-sync.js android && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "electron-updater": "6.8.9"

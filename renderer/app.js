@@ -768,13 +768,13 @@ VIEWS.ayarlar = () => {
   <div class="card mt"><h2>Gelir kategorileri<span class="spacer"></span><button class="btn btn-sm" data-action="add-cat" data-type="income">+ Ekle</button></h2><div class="chips">${catChips('income')}</div></div>
   <div class="card mt"><h2>Hesaplar<span class="spacer"></span><button class="btn btn-sm" data-goto="hesaplar">Hesapları yönet</button></h2>
     <div class="chips">${d.accounts.filter(a => !a.archived).map(a => `<span class="chip" style="padding-right:10px"><span class="dot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div></div>
-  <div class="card mt"><h2>Güncellemeler</h2>
+  <div class="card mt"><h2>${api.platform === 'ios' ? 'Uygulama' : 'Güncellemeler'}</h2>
     <div class="set-row"><div class="main-col"><b>Öneri ve sorun bildir</b><div class="muted">Bir fikrin mi var, bir şey mi bozuk? Doğrudan bana ulaşır.</div></div>
       <button class="btn" data-action="feedback" data-kind="sorun">Sorun bildir</button><button class="btn" data-action="feedback">Öneri gönder</button></div>
-    <div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
+    ${api.platform === 'ios' ? `<div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted">Yeni sürümler App Store üzerinden gelir.</div></div></div>` : `<div class="set-row"><div class="main-col"><b>Sürüm <span id="verText">${esc(S.version)}</span></b><div class="muted upd-status" id="updStatus">${updateText()}</div></div>
       <button class="btn" data-action="open-repo">GitHub sayfası</button>
       <span id="updBtnWrap">${updateButton()}</span></div>
-    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">${api.platform === 'ios' ? 'Yeni sürümler App Store üzerinden gelir.' : api.platform === 'android' ? 'Uygulama açılırken yeni sürüm olup olmadığına bakar. Yeni sürüm çıkınca haber verir, dokununca indirilir. Verilerin güncellemeden etkilenmez.' : 'Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. Yeni sürüm arka planda iner, program kapanınca kendiliğinden kurulur. Verilerin güncellemeden etkilenmez.'}</div></div>
+    <div class="set-row"><div class="main-col muted" style="font-size:12.5px">${api.platform === 'android' ? 'Uygulama açılırken yeni sürüm olup olmadığına bakar. Yeni sürüm çıkınca haber verir, dokununca indirilir. Verilerin güncellemeden etkilenmez.' : 'Program açılırken ve açık kaldığı sürece 6 saatte bir yeni sürüm olup olmadığına bakar. Yeni sürüm arka planda iner, program kapanınca kendiliğinden kurulur. Verilerin güncellemeden etkilenmez.'}</div></div>`}
   </div>
   <p class="muted mt" id="appInfo" style="font-size:12px"></p>`;
 };
@@ -1415,7 +1415,7 @@ document.addEventListener('click', async e => {
       return;
     }
     case 'open-folder': return api.openDataFolder();
-    case 'open-repo': return api.openUrl(REPO_URL);
+    case 'open-repo': return api.platform === 'ios' ? null : api.openUrl(REPO_URL);
     case 'open-privacy': return api.openUrl('https://emirhanduran27-lab.github.io/kurusu-kurusuna/gizlilik.html');
     case 'check-update': S.update = { status: 'checking' }; refreshUpdateUI(); return api.checkUpdate();
     case 'install-update':

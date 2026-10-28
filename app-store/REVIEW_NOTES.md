@@ -1,26 +1,46 @@
-# App Review notları — gönderim öncesi doğrulanacak taslak
+# App Review notları
 
-Yeni build gerçek cihazda test edildikten sonra İngilizce notları App Store Connect'e aktarın. Hesap gerektiren eşitlemeyi incelemek için ayrı bir test hesabı ve gerekli veri parolası sağlayın; parolaları bu depoya yazmayın. Aşağıdaki notlar şu anda App Store Connect'e gönderilmedi.
+App Store Connect'te sürüm sayfasının en altındaki **App Review Information > Notes** kutusuna aşağıdaki İngilizce metni yapıştır.
+Deneme hesabının e-posta ve parolasını **Sign-in information** kutularına yaz. Parolaları bu dosyaya yazma.
 
-## Notes for Review
+## Notes (kopyala)
 
-Kuruşu Kuruşuna is a personal income, expense and budget tracker. Core local tracking works without an account. Account sign-in is used for optional encrypted synchronization.
+Kuruşu Kuruşuna is a personal income, expense and budget tracker. Everything below is available to every user on every device; nothing is enabled or disabled remotely, by region, by date or by account. The app does not download or execute code, and all screens are bundled in the app.
 
-- On a fresh installation, tap “Örnek verilerle dene” to add sample records to the regular app. These records can be removed in Settings; this does not enable a separate feature set.
-- The bottom tabs provide Overview, Transactions, Accounts and Recurring Payments.
-- Tap “Diğer” (More) for Savings, Currency and Gold tracking, Debts and Receivables, Budget and Reports, and Settings. These sections record personal finances; they do not execute bank transfers or buy/sell financial assets.
-- In Settings, “Hesap ve eşitleme” provides email, Google and Sign in with Apple options. After sign-in, synchronization uses a separate data passphrase.
-- Account deletion is available under Settings → Account → “Hesabımı sil”, including when the data passphrase has not been entered. Deletion removes the cloud account; local device records remain, as explained in the confirmation.
-- Settings → Security and privacy → “Politikayı aç” opens the privacy policy. Optional PIN/password/biometric locking and amount hiding are user-controlled privacy settings.
-- Statement import is available in Transactions. Monthly PDF export is in Budget and Reports.
-- Currency/metal prices and synchronization require network access. Local financial tracking works offline. iOS updates are distributed through the App Store.
+QUICK START
+On first launch tap "Örnek verilerle dene" (Try with sample data). This only fills the app with example records so every screen has content. Sample records can be removed in Settings > "Örnekleri sil".
 
-## Clarification request for the existing rejection
+WHERE EACH FEATURE IS (bottom tab bar)
+1. "Özet" (Overview): monthly income, expenses, savings, insights card, upcoming payments, budgets, accounts and net worth. "PDF rapor" button on the insights card creates the monthly PDF report.
+2. "İşlemler" (Transactions): list, search and filters. The green "+" button adds an expense or income. "Ekstre içe aktar" imports a bank statement (Excel or CSV). "CSV dışa aktar" exports.
+3. "Hesaplar" (Accounts): cash, bank and credit card accounts, transfers, card statement and due date.
+4. "Ödemeler" (Recurring payments): rent, bills, subscriptions and reminders.
+5. "Diğer" (More) opens a menu with: "Birikimler" (savings goals), "Döviz ve Altın" (foreign currency and gold holdings, prices from public exchange rate APIs), "Borç ve Alacak" (debts and receivables), "Bütçe ve Raporlar" (category budgets, charts, monthly PDF), "Ayarlar" (Settings) and "Öneri ve sorun bildir" (feedback form).
+These sections only record personal finances. The app does not move money, connect to banks, trade, or sell anything.
+
+SETTINGS (Diğer > Ayarlar)
+- Top card "Hesap ve eşitleme": optional account for syncing the user's own devices. Sign in with Apple, Google or email. After sign-in the user sets a data passphrase; records are end-to-end encrypted on the device before upload.
+- Account deletion: tap the account card > "Hesabımı sil" (Delete my account).
+- "Güvenlik ve gizlilik": optional PIN/password lock with Face ID, hide amounts, and "Politikayı aç" opens the privacy policy.
+- Reminder day/time and "Bildirimi dene" (test notification).
+
+DEMO ACCOUNT (optional, only needed to test sync)
+Email and password are in the Sign-in information fields. After signing in, the app asks for the data passphrase: [VERI PAROLASI]
+
+The app works fully without an account and offline; only sync, sign-in, exchange rates and feedback need a network connection.
+
+## Önceki ret mesajına cevap (Resolution Center, kopyala)
 
 Hello App Review Team,
 
-Regarding version 1.9.0, build 202610192213, we take your concern under Guideline 5.6 seriously. Could you please identify the features that appeared to be intentionally hidden, along with the steps to reproduce the behavior and the device model and OS version used? A screenshot would also help us investigate.
+Thank you for the review. We do not hide any functionality: every feature in the app is available to all users and reviewers, with no remote switches, region or date checks, or code downloads.
 
-Additional budgeting sections are accessible through the “Diğer” (More) tab, and optional synchronization is accessible through “Ayarlar” (Settings). We would appreciate further details so we can investigate the exact behavior in the submitted build.
+To make this easier to verify, version 1.9.1:
+- removes the in-app link to our source code page and all non-App Store update checks from the iOS build,
+- adds a privacy policy link in Settings and makes account deletion always reachable,
+- includes step-by-step Review Notes listing where every feature described in the App Store description can be found, plus a demo account for the optional sync.
 
-Thank you.
+If a specific feature or behavior caused concern, we would be grateful if you could tell us which one, along with the device and steps, so we can address it directly.
+
+Thank you,
+Emirhan Duran
